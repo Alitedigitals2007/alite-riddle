@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alite Riddles | Clean Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; color: #1e293b; }
+        .bento-card { 
+            background: white; 
+            border: 1px solid #e2e8f0; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .bento-card:hover { transform: translateY(-4px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border-color: #cbd5e1; }
+        .teal-gradient { background: linear-gradient(135deg, #0d9488 0%, #2563eb 100%); }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <nav class="max-w-6xl mx-auto p-8 flex justify-between items-center">
+    <div class="text-2xl font-extrabold tracking-tight text-slate-900">
+        ALITE<span class="text-teal-600">.</span>
+    </div>
+    <div class="flex items-center gap-8">
+        <a href="/leaderboard" class="text-sm font-semibold text-slate-500 hover:text-slate-900">Leaderboard</a>
+        <a href="/signin" class="bg-slate-900 text-white text-sm font-bold px-6 py-2.5 rounded-full hover:bg-slate-800 transition text-center">
+            Sign In
+        </a>
+    </div>
+</nav>
+
+    <main class="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-12 gap-5 auto-rows-[180px]">
+        
+        <div class="md:col-span-8 md:row-span-2 bento-card rounded-[2.5rem] p-12 flex flex-col justify-center relative overflow-hidden">
+            <div class="absolute -top-24 -right-24 h-64 w-64 teal-gradient opacity-10 rounded-full"></div>
+            <span class="text-teal-600 font-bold text-sm tracking-widest uppercase mb-4 italic">Sharpen your mind</span>
+            <h2 class="text-5xl md:text-6xl font-extrabold text-slate-900 leading-[1.1] mb-6">Master the art of the riddle.</h2>
+            <div class="flex gap-4">
+                <a href="/solo" class="bg-slate-900 text-white px-10 py-4 rounded-2xl font-bold hover:bg-slate-800 transition shadow-xl shadow-slate-200">Start Solo</a>
+                <a href="/how" class="bg-white border border-slate-200 px-8 py-4 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition">Learn More</a>
+            </div>
+        </div>
+
+        <div class="md:col-span-4 md:row-span-1 bento-card rounded-[2.5rem] p-8 flex flex-col justify-center group cursor-pointer hover:bg-teal-50">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="text-xl font-bold text-slate-900">1v1 Battle</h3>
+                    <p class="text-slate-500 text-sm">Real-time challenges.</p>
+                </div>
+                <div class="h-12 w-12 rounded-2xl teal-gradient flex items-center justify-center text-white shadow-lg shadow-teal-200">
+                    ⚔️
+                </div>
+            </div>
+        </div>
+
+        <div class="md:col-span-2 md:row-span-1 bento-card rounded-[2.5rem] p-8 flex flex-col justify-center text-center">
+            <p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Global Rank</p>
+            <p class="text-3xl font-black text-slate-900">#142</p>
+        </div>
+
+        <div class="md:col-span-2 md:row-span-1 bento-card rounded-[2.5rem] p-8 flex flex-col justify-center text-center">
+            <p class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-1">Questions</p>
+            <p class="text-3xl font-black text-slate-900">1.2k+</p>
+        </div>
+
+        <div class="md:col-span-4 md:row-span-1 bento-card rounded-[2.5rem] p-8 flex items-center justify-between bg-teal-600 text-white border-none">
+            <div>
+                <h3 class="text-xl font-bold">Join the Community</h3>
+                <p class="text-teal-100 text-sm">Connect with other players.</p>
+            </div>
+            <div class="text-2xl">👉</div>
+        </div>
+
+        <div class="md:col-span-8 md:row-span-1 bento-card rounded-[2.5rem] p-8 flex items-center justify-between group cursor-pointer">
+            <div class="flex items-center gap-6">
+                <div class="h-16 w-16 bg-slate-100 rounded-3xl flex items-center justify-center text-3xl group-hover:scale-110 transition">⏱️</div>
+                <div>
+                    <h3 class="text-2xl font-bold text-slate-900">Speed Challenge</h3>
+                    <p class="text-slate-500">Beat the clock, claim the prize.</p>
+                </div>
+            </div>
+            <button class="bg-slate-100 p-4 rounded-full group-hover:bg-slate-900 group-hover:text-white transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M9 5l7 7-7 7" /></svg>
+            </button>
+        </div>
+
+    </main>
+
+</body>
+</html>

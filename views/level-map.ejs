@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Campaign Map | Alite Riddles</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .path-container { background: radial-gradient(circle, #f8fafc 0%, #e2e8f0 100%); }
+        .level-node { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .level-node:hover:not(.locked) { transform: scale(1.1) rotate(5deg); }
+        .locked { filter: grayscale(1); cursor: not-allowed; opacity: 0.7; }
+        
+        /* The Winding Path Logic */
+        .row-right { transform: translateX(40px); }
+        .row-left { transform: translateX(-40px); }
+    </style>
+</head>
+<body class="path-container min-h-screen pb-20">
+    <div class="max-w-md mx-auto px-6">
+        
+        <div class="sticky top-0 z-50 bg-white/80 backdrop-blur-md p-6 mb-10 rounded-b-3xl shadow-sm flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-black text-slate-900">Quest Map</h1>
+                <p class="text-teal-600 font-bold text-sm">Level <%= user.current_level %> Unlocked</p>
+            </div>
+            <a href="/dashboard" class="p-3 bg-slate-100 rounded-2xl">🏠</a>
+        </div>
+
+        <div class="relative flex flex-col items-center gap-12">
+            <% for(let i = 1; i <= 100; i++) { %>
+                <% 
+                   let isLocked = i > (user.current_level || 1); 
+                   // Alternate alignment every 2 levels to create a "Snake"
+                   let alignment = (Math.floor(i/2) % 2 === 0) ? 'row-right' : 'row-left';
+                %>
+
+                <div class="relative <%= alignment %>">
+                    <% if(isLocked) { %>
+                        <div class="level-node locked w-24 h-24 bg-slate-300 rounded-full border-8 border-slate-400 flex items-center justify-center shadow-lg">
+                            <span class="text-3xl">🔒</span>
+                        </div>
+                    <% } else { %>
+                        <a href="/start-level/<%= i %>" class="level-node w-24 h-24 bg-teal-500 border-8 border-teal-300 rounded-full flex flex-col items-center justify-center shadow-[0_10px_0_0_#0d9488] active:shadow-none active:translate-y-2">
+                            <span class="text-white font-black text-3xl"><%= i %></span>
+                            <% if(i === user.current_level) { %>
+                                <div class="absolute -top-4 bg-yellow-400 text-yellow-900 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-sm animate-bounce">Current</div>
+                            <% } %>
+                        </a>
+                    <% } %>
+
+                    <% if(i < 100) { %>
+                        <div class="absolute left-1/2 -bottom-12 w-2 h-12 bg-slate-300 -translate-x-1/2 -z-10"></div>
+                    <% } %>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</body>
+</html>

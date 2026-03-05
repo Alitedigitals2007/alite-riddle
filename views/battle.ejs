@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Battle Arena | Alite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0f172a; color: white; overflow-x: hidden; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .option-btn { 
+            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); 
+            border-radius: 1.5rem; padding: 1.25rem; font-weight: 700; transition: all 0.2s; color: white; width: 100%; text-align: left;
+        }
+        .option-btn:hover:not(:disabled) { border-color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
+        .my-correct { background: #164e63 !important; border-color: #06b6d4 !important; }
+        .my-wrong { background: #7f1d1d !important; border-color: #ef4444 !important; }
+
+        /* THE GLOW EFFECT */
+        .opp-card { transition: all 0.3s; }
+        .opponent-glow { animation: pulse-rose 1.5s infinite; border-color: #ef4444 !important; }
+        .teammate-glow { animation: pulse-cyan 1.5s infinite; border-color: #06b6d4 !important; }
+        
+        @keyframes pulse-rose {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        @keyframes pulse-cyan {
+            0% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(6, 182, 212, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <div id="lobbyContainer" class="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6">
+        <div class="max-w-md w-full glass p-8 rounded-[3rem] text-center shadow-2xl">
+            <h2 class="text-3xl font-black mb-2 italic tracking-tighter">BATTLE <span class="text-cyan-500">ARENA</span></h2>
+            <p class="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-8">Select Mode or Join Friend</p>
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <button onclick="createRoom('single')" class="bg-white/5 border border-white/10 p-6 rounded-3xl hover:bg-cyan-600/20 hover:border-cyan-500 transition-all group">
+                    <span class="block text-2xl mb-1 group-hover:scale-110 transition">👤</span>
+                    <span class="text-xs font-black uppercase">Solo 1v1</span>
+                </button>
+                <button onclick="createRoom('team')" class="bg-white/5 border border-white/10 p-6 rounded-3xl hover:bg-indigo-600/20 hover:border-indigo-500 transition-all group">
+                    <span class="block text-2xl mb-1 group-hover:scale-110 transition">👥</span>
+                    <span class="text-xs font-black uppercase">Team 2v2</span>
+                </button>
+            </div>
+
+            <div class="relative flex items-center gap-4 mb-6">
+                <div class="h-px bg-white/10 flex-grow"></div>
+                <span class="text-[10px] font-black text-slate-600">OR JOIN WITH CODE</span>
+                <div class="h-px bg-white/10 flex-grow"></div>
+            </div>
+
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="roomCodeInput" placeholder="ENTER CODE" maxlength="5" class="bg-slate-900 border-2 border-white/5 rounded-2xl p-4 w-full font-black text-center tracking-widest uppercase focus:border-cyan-500 transition outline-none">
+                <button onclick="joinRoom()" class="bg-white text-slate-900 px-6 rounded-2xl font-black hover:bg-cyan-400 transition">JOIN</button>
+            </div>
+            
+            <p id="lobbyStatus" class="text-[10px] font-bold text-cyan-500 uppercase tracking-widest h-4"></p>
+        </div>
+    </div>
+
+    <nav id="gameUI" class="hidden flex-col h-screen">
+        <div class="p-6 grid grid-cols-3 items-center">
+            <div class="flex items-center gap-3">
+                <div class="h-12 w-12 bg-cyan-500 rounded-xl flex items-center justify-center font-black" id="myAvatar"><%= user.username[0] %></div>
+                <div>
+                    <p class="text-[10px] font-bold text-cyan-400 uppercase" id="myTeamTag">TEAM A</p>
+                    <p id="teamAScore" class="text-2xl font-black">0</p>
+                </div>
+            </div>
+            <div class="text-center">
+                <div id="timer" class="text-4xl font-black italic">15</div>
+                <p id="roundStatus" class="text-[10px] font-bold text-slate-500 uppercase">Round 1/5</p>
+                <p id="displayRoomCode" class="text-[8px] text-slate-600 font-bold mt-1 uppercase"></p>
+            </div>
+            <div class="flex items-center gap-3 justify-end">
+                <div class="text-right">
+                    <p class="text-[10px] font-bold text-rose-400 uppercase" id="oppTeamTag">TEAM B</p>
+                    <p id="teamBScore" class="text-2xl font-black">0</p>
+                </div>
+                <div id="oppAvatar" class="opp-card h-12 w-12 bg-rose-500 rounded-xl flex items-center justify-center font-black border-2 border-transparent">?</div>
+            </div>
+        </div>
+
+        <div class="w-full h-2 bg-slate-800 flex">
+            <div id="tugBar" class="h-full bg-cyan-500 transition-all duration-700" style="width: 50%"></div>
+            <div class="h-full bg-rose-500 flex-grow"></div>
+        </div>
+
+        <main class="flex-grow flex flex-col items-center justify-center p-6">
+            <div class="max-w-2xl w-full text-center">
+                <h2 id="qText" class="text-3xl font-extrabold mb-10 leading-tight">...</h2>
+                <div id="options" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+        </main>
+    </nav>
+
+    <script>
+        const socket = io();
+        const userId = '<%= user.id %>';
+        const username = '<%= user.username %>';
+        let myScore = 0, currentIndex = 0, timeLeft = 15, timer, currentRoom, riddles = [], myTeam = 'A';
+
+        // --- LOBBY LOGIC ---
+        function createRoom(type) {
+            document.getElementById('lobbyStatus').innerText = "Generating Room...";
+            socket.emit('createRoom', { type, userId, username });
+        }
+
+        function joinRoom() {
+            const code = document.getElementById('roomCodeInput').value.toUpperCase();
+            if(!code) return;
+            document.getElementById('lobbyStatus').innerText = "Joining Room...";
+            socket.emit('joinRoom', { roomId: code, userId, username });
+        }
+
+        socket.on('roomCreated', (data) => {
+            currentRoom = data.roomId;
+            document.getElementById('lobbyStatus').innerText = `CODE: ${data.roomId} (Waiting for Players)`;
+            document.getElementById('displayRoomCode').innerText = `ROOM: ${data.roomId}`;
+        });
+
+        socket.on('playerJoined', (data) => {
+            document.getElementById('lobbyStatus').innerText = `Players in Lobby: ${data.count}`;
+        });
+
+        socket.on('error', (msg) => {
+            document.getElementById('lobbyStatus').innerText = msg;
+        });
+
+        // --- GAME START ---
+        socket.on('matchStarted', data => {
+            currentRoom = data.roomId; 
+            riddles = data.riddles;
+            
+            // Assign my team visually
+            const me = data.allPlayers.find(p => p.id == userId);
+            myTeam = me.team;
+            
+            document.getElementById('myTeamTag').innerText = (myTeam === 'A') ? "YOUR TEAM (A)" : "YOUR TEAM (B)";
+            document.getElementById('oppTeamTag').innerText = (myTeam === 'A') ? "ENEMY TEAM (B)" : "ENEMY TEAM (A)";
+            
+            // Adjust colors if on Team B
+            if(myTeam === 'B') {
+                document.getElementById('myAvatar').classList.replace('bg-cyan-500', 'bg-rose-500');
+                document.getElementById('oppAvatar').classList.replace('bg-rose-500', 'bg-cyan-500');
+            }
+
+            document.getElementById('lobbyContainer').classList.add('hidden');
+            document.getElementById('gameUI').classList.remove('hidden');
+            renderRound();
+        });
+
+        // --- ROUND LOGIC ---
+        function renderRound() {
+            if(currentIndex >= 5) return finishBattle();
+            timeLeft = 15;
+            const r = riddles[currentIndex];
+            document.getElementById('qText').innerText = r.question;
+            document.getElementById('roundStatus').innerText = `Round ${currentIndex+1}/5`;
+            
+            const optDiv = document.getElementById('options');
+            optDiv.innerHTML = '';
+            ['a','b','c','d'].forEach(l => {
+                const b = document.createElement('button');
+                b.className = 'option-btn';
+                b.innerText = r['option_'+l];
+                b.onclick = () => select(l.toUpperCase(), b);
+                optDiv.appendChild(b);
+            });
+
+            clearInterval(timer);
+            timer = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').innerText = timeLeft;
+                if(timeLeft <= 0) { currentIndex++; renderRound(); }
+            }, 1000);
+        }
+
+        function select(choice, btn) {
+            clearInterval(timer);
+            const correct = choice === riddles[currentIndex].answer;
+            if(correct) {
+                myScore += (20 + (timeLeft > 10 ? 10 : 0));
+                btn.classList.add('my-correct');
+            } else {
+                btn.classList.add('my-wrong');
+            }
+            
+            // Send updated individual score to server to aggregate team total
+            socket.emit('send-answer', { roomId: currentRoom, userId: userId, newScore: myScore, isCorrect: correct });
+            setTimeout(() => { currentIndex++; renderRound(); }, 1200);
+        }
+
+        // Handle Score Updates (Aggregate Team Scores)
+        socket.on('scoreUpdated', data => {
+            document.getElementById('teamAScore').innerText = data.teamAScore;
+            document.getElementById('teamBScore').innerText = data.teamBScore;
+            
+            const total = data.teamAScore + data.teamBScore;
+            const percentage = total === 0 ? 50 : (data.teamAScore / total * 100);
+            document.getElementById('tugBar').style.width = percentage + '%';
+
+            // Visual feedback: If opponent (Enemy team) answers
+            document.getElementById('oppAvatar').classList.add('opponent-glow');
+            setTimeout(() => document.getElementById('oppAvatar').classList.remove('opponent-glow'), 1000);
+        });
+
+        function finishBattle() {
+            socket.emit('battleComplete', { userId, pointsWon: myScore });
+            document.getElementById('qText').innerHTML = `<p class="text-cyan-400">BATTLE ENDED</p><p class="text-5xl font-black">+${myScore} XP</p>`;
+            document.getElementById('options').innerHTML = `<a href="/dashboard" class="col-span-full bg-cyan-600 p-5 rounded-3xl font-black text-center">EXIT ARENA</a>`;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Alite Admin | Command Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f8fafc; color: #1e293b; }
+        .stat-card { background: white; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .glass-nav { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border-bottom: 1px solid #e2e8f0; }
+    </style>
+</head>
+<body class="min-h-screen pb-20">
+
+    <div id="lockScreen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-md">
+        <div class="bg-white p-10 rounded-[2.5rem] shadow-2xl text-center max-w-sm w-full mx-4">
+            <div class="h-16 w-16 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-2xl">🔒</div>
+            <h2 class="text-2xl font-bold mb-2 text-slate-900">Admin Access</h2>
+            <p class="text-slate-500 text-sm mb-6">Enter credentials to manage the platform.</p>
+            <input type="password" id="adminPass" placeholder="••••••••" class="w-full p-4 rounded-xl bg-slate-50 border border-slate-200 mb-4 text-center focus:ring-2 focus:ring-teal-500 outline-none transition">
+            <button onclick="unlock()" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition">Unlock System</button>
+        </div>
+    </div>
+
+    <div id="mainContent" class="opacity-0 transition-opacity duration-700">
+        <nav class="glass-nav sticky top-0 z-40 p-6 mb-10">
+            <div class="max-w-6xl mx-auto flex justify-between items-center">
+                <div class="font-extrabold text-xl tracking-tight">ALITE<span class="text-teal-600">.</span>ADMIN</div>
+                <a href="/" class="text-sm font-semibold text-slate-500 hover:text-teal-600">Back to Site</a>
+            </div>
+        </nav>
+
+        <main class="max-w-6xl mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                <div class="stat-card p-8 rounded-[2rem]">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Riddles in Bank</p>
+                    <p class="text-4xl font-black text-slate-900"><%= questions %></p>
+                </div>
+                <div class="stat-card p-8 rounded-[2rem]">
+                    <p class="text-xs font-bold text-teal-500 uppercase tracking-widest mb-1">Registered Users</p>
+                    <p class="text-4xl font-black text-slate-900"><%= users %></p>
+                </div>
+                <div class="stat-card p-8 rounded-[2rem] bg-teal-600 border-none">
+                    <p class="text-xs font-bold text-teal-100 uppercase tracking-widest mb-1">System Status</p>
+                    <p class="text-xl font-bold text-white">All Systems Operational</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-[2.5rem] border border-slate-200 p-10 shadow-sm">
+                <div class="flex justify-between items-start mb-8">
+                    <div>
+                        <h3 class="text-2xl font-bold text-slate-900">Bulk Data Import</h3>
+                        <p class="text-slate-500">Paste your JSON riddle array to sync with Neon Cloud.</p>
+                    </div>
+                    <button onclick="copyTemplate()" class="text-sm font-bold text-teal-600 hover:underline">Copy Template</button>
+                </div>
+
+                <textarea id="jsonInput" placeholder='[{"question": "What has keys but...", "option_a": "Piano", ...}]' 
+                    class="w-full h-80 bg-slate-50 p-6 rounded-2xl border border-slate-200 font-mono text-sm focus:border-teal-500 outline-none transition mb-6"></textarea>
+                
+                <div id="status" class="hidden mb-6 p-4 rounded-xl text-sm font-bold"></div>
+
+                <button onclick="uploadRiddles()" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold text-lg hover:bg-slate-800 hover:shadow-xl transition-all flex items-center justify-center gap-3">
+                    <span>Sync with Database</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function unlock() {
+            const pass = document.getElementById('adminPass').value;
+            if (pass === "alite") { 
+                document.getElementById('lockScreen').classList.add('hidden');
+                document.getElementById('mainContent').classList.replace('opacity-0', 'opacity-100');
+            } else {
+                alert("Unauthorized Access");
+            }
+        }
+
+        async function uploadRiddles() {
+            const input = document.getElementById('jsonInput').value;
+            const status = document.getElementById('status');
+            
+            try {
+                const riddles = JSON.parse(input);
+                const response = await fetch('/admin/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ riddles })
+                });
+                const result = await response.json();
+                
+                status.className = `block mb-6 p-4 rounded-xl ${result.success ? 'bg-teal-50 text-teal-700' : 'bg-red-50 text-red-700'}`;
+                status.innerText = result.message || result.error;
+            } catch (e) {
+                alert("JSON Format Error: Please ensure you are pasting a valid array [ ].");
+            }
+        }
+
+        function copyTemplate() {
+            const temp = `[
+  {
+    "question": "Enter Riddle Here",
+    "option_a": "Choice A",
+    "option_b": "Choice B",
+    "option_c": "Choice C",
+    "option_d": "Choice D",
+    "answer": "Choice A"
+  }
+]`;
+            navigator.clipboard.writeText(temp);
+            alert("Template copied to clipboard!");
+        }
+    </script>
+</body>
+</html>

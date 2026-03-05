@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Sign In | Alite Riddles</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f1f5f9; }
+        .auth-card { background: white; border: 1px solid #e2e8f0; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05); }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-6">
+
+    <div class="auth-card max-w-md w-full p-10 rounded-[2.5rem] text-center">
+        <div class="text-3xl font-black mb-2">ALITE<span class="text-teal-600">.</span></div>
+        <h2 class="text-xl font-bold text-slate-900 mb-8">Welcome back, Genius.</h2>
+        
+        <button onclick="window.location.href='/auth/google'" class="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 py-4 rounded-2xl font-bold text-slate-700 hover:bg-slate-50 transition-all">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/layout/google.svg" width="20">
+            Continue with Google
+        </button>
+
+        <p class="mt-8 text-xs text-slate-400 px-6">
+            By signing in, you agree to the Alite Riddles terms of brain-usage. Admin access is restricted.
+        </p>
+    </div>
+
+</body>
+</html>
