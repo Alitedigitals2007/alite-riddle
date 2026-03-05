@@ -96,31 +96,31 @@ passport.use(new GoogleStrategy({
     proxy: true
   },
 async (accessToken, refreshToken, profile, done) => {
-    try {
-      // 1. Get user info from Google Profile
-      const googleId = profile.id;
-      const email = profile.emails[0].value;
-      const name = profile.displayName;
+  try {
+    const googleId = profile.id;
+    const email = profile.emails[0].value;
+    const name = profile.displayName;
 
-      // 2. Check if user exists in your Neon DB
-      // Use 'pool' which should have { ssl: { rejectUnauthorized: false } }
-      let res = await pool.query('SELECT * FROM users WHERE google_id = $1', [googleId]);
+    // This query handles everything: 
+    // It tries to insert, but if google_id exists, it just returns the existing user.
+    const query = `
+      INSERT INTO users (google_id, username, email) 
+      VALUES ($1, $2, $3) 
+      ON CONFLICT (google_id) 
+      DO UPDATE SET username = EXCLUDED.username, email = EXCLUDED.email
+      RETURNING *;
+    `;
 
-      if (res.rows.length > 0) {
-        return done(null, res.rows[0]);
-      } else {
-        // 3. Create new user if they don't exist
-        const newUser = await pool.query(
-          'INSERT INTO users (google_id, username, email) VALUES ($1, $2, $3) RETURNING *',
-          [googleId, name, email]
-        );
-        return done(null, newUser.rows[0]);
-      }
-    } catch (err) {
-      console.error("CRITICAL AUTH ERROR:", err); // Look for this in Vercel Logs
-      return done(err, null);
-    }
+    const res = await pool.query(query, [googleId, name, email]);
+    
+    // Return the user (either the newly created one or the updated existing one)
+    return done(null, res.rows[0]);
+
+  } catch (err) {
+    console.error("CRITICAL AUTH ERROR:", err);
+    return done(err, null);
   }
+}
 ));
 
 passport.serializeUser((user, done) => done(null, user.id));
