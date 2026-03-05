@@ -95,23 +95,30 @@ passport.use(new GoogleStrategy({
     callbackURL: "/auth/google/callback",
     proxy: true
   },
-  async (accessToken, refreshToken, profile, done) => {
+async (accessToken, refreshToken, profile, done) => {
     try {
-        // Here we check if user exists in your Neon 'users' table
-        const res = await pool.query('SELECT * FROM users WHERE email = $1', [profile.emails[0].value]);
-        
-        let user = res.rows[0];
-        if (!user) {
-            // Create user if they don't exist
-            const newUser = await pool.query(
-                'INSERT INTO users (username, email) VALUES ($1, $2) RETURNING *',
-                [profile.displayName, profile.emails[0].value]
-            );
-            user = newUser.rows[0];
-        }
-        return done(null, user);
+      // 1. Get user info from Google Profile
+      const googleId = profile.id;
+      const email = profile.emails[0].value;
+      const name = profile.displayName;
+
+      // 2. Check if user exists in your Neon DB
+      // Use 'pool' which should have { ssl: { rejectUnauthorized: false } }
+      let res = await pool.query('SELECT * FROM users WHERE google_id = $1', [googleId]);
+
+      if (res.rows.length > 0) {
+        return done(null, res.rows[0]);
+      } else {
+        // 3. Create new user if they don't exist
+        const newUser = await pool.query(
+          'INSERT INTO users (google_id, username, email) VALUES ($1, $2, $3) RETURNING *',
+          [googleId, name, email]
+        );
+        return done(null, newUser.rows[0]);
+      }
     } catch (err) {
-        return done(err, null);
+      console.error("CRITICAL AUTH ERROR:", err); // Look for this in Vercel Logs
+      return done(err, null);
     }
   }
 ));
