@@ -367,24 +367,9 @@ app.get('/api/gauntlet/start', async (req, res) => {
 app.get('/api/gauntlet/start', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM riddles ORDER BY RANDOM() LIMIT 10');
-        
-        // SAFETY CHECK: If DB is empty or options are missing, use these
-        const safeRiddles = (result.rows.length > 0 && result.rows[0].options) 
-            ? result.rows 
-            : [{
-                question: "Link Established: What is the primary color of the Alite Studio?",
-                options: ["Deep Slate", "Neon Pink", "Bright Yellow", "Forest Green"],
-                answer: "A"
-            }];
-
-        res.json({ success: true, riddles: safeRiddles });
+        res.json({ success: true, riddles: result.rows });
     } catch (err) {
-        console.error("DB Error:", err);
-        // Even on error, send the fallback so the game starts
-        res.json({ 
-            success: true, 
-            riddles: [{ question: "Backup Mode: Is 2 + 2 = 4?", options: ["Yes", "No", "Maybe", "Error"], answer: "A" }] 
-        });
+        res.status(500).json({ success: false, error: "Database Link Error" });
     }
 });
 
