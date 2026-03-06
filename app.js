@@ -389,6 +389,18 @@ app.post('/api/gauntlet/win', async (req, res) => {
         res.status(500).json({ error: "Could not save progress" });
     }
 });
+// This tells the server: "When someone visits /gauntlet, show them the gauntlet page"
+app.get('/gauntlet', (req, res) => {
+    // Ensure the user is logged in before they can play
+    if (!req.user) {
+        return res.redirect('/login');
+    }
+    
+    // Render the gauntlet.ejs file from your views folder
+    res.render('gauntlet', {
+        user: req.user
+    });
+});
 // 5. START SERVER
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
