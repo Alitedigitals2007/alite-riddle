@@ -338,38 +338,71 @@ app.get('/api/scoreboard', async (req, res) => {
         res.status(500).json([]);
     }
 });
-// --- THE GAUNTLET: FETCH RANDOM RIDDLES ---
+// --- GAUNTLET API ROUTES ---
+
+/**
+ * 1. START GAUNTLET
+ * Fetches a randomized set of riddles for the session.
+ */
 app.get('/api/gauntlet/start', async (req, res) => {
     try {
-        // 1. Try to fetch 10 random riddles from Neon
-        const result = await pool.query('SELECT * FROM riddles ORDER BY RANDOM() LIMIT 10');
-        
-        if (result.rows.length > 0) {
-            return res.json({ success: true, riddles: result.rows });
-        }
+        // Fetches 10 random riddles. Adjust the 'LIMIT' to change game length.
+        const result = await db.query(
+            'SELECT id, question, option_a, option_b, option_c, option_d, answer FROM riddles ORDER BY RANDOM() LIMIT 10'
+        );
 
-        // 2. Fallback Riddles (If DB is empty)
-        const fallbackRiddles = [
-            { question: "What falls but never breaks, and what breaks but never falls?", answer: "Night and Day" },
-            { question: "I have keys, but no locks. I have a space, but no room. What am I?", answer: "Keyboard" },
-            { question: "If a projectile is fired at 45 degrees, what is maximized?", answer: "Range" },
-            { question: "The more of me there is, the less you see. What am I?", answer: "Darkness" }
-        ];
-        
-        res.json({ success: true, riddles: fallbackRiddles.sort(() => Math.random() - 0.5) });
-
+        res.json({
+            success: true,
+            riddles: result.rows
+        });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Failed to load Gauntlet" });
+        console.error("Error starting gauntlet:", err);
+        res.status(500).json({ success: false, message: "Could not initialize riddles" });
     }
 });
 
-app.get('/api/gauntlet/start', async (req, res) => {
+/**
+ * 2. SETTLE GAUNTLET
+ * Saves the session progress (XP and Points) to the user's profile.
+ */
+app.post('/api/gauntlet/settle', async (req, res) => {
+    // Ensure the user is logged in
+    if (!req.user) {
+        return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    const { xp, status } = req.body;
+    const userId = req.user.id;
+
     try {
-        const result = await pool.query('SELECT * FROM riddles ORDER BY RANDOM() LIMIT 10');
-        res.json({ success: true, riddles: result.rows });
+        // Logic: Full XP on win, 50% XP on loss
+        const finalXpGain = status === 'win' ? xp : Math.floor(xp / 2);
+        
+        // Logic: Points are 10% of the XP gained (Adjust as needed)
+        const pointsGain = Math.floor(finalXpGain * 0.1);
+
+        // Update the user table (increments existing values)
+        const updateQuery = `
+            UPDATE users 
+            SET xp = xp + $1, 
+                points = points + $2 
+            WHERE id = $3
+            RETURNING xp, points;
+        `;
+
+        const result = await db.query(updateQuery, [finalXpGain, pointsGain, userId]);
+
+        res.json({
+            success: true,
+            message: "Session synchronized",
+            addedXp: finalXpGain,
+            addedPoints: pointsGain,
+            newTotalXp: result.rows[0].xp
+        });
+
     } catch (err) {
-        res.status(500).json({ success: false, error: "Database Link Error" });
+        console.error("Settlement error:", err);
+        res.status(500).json({ success: false, message: "Failed to save progress" });
     }
 });
 
