@@ -133,7 +133,38 @@ passport.deserializeUser(async (id, done) => {
 app.get('/auth/google', passport.authenticate('google', { 
     scope: ['profile', 'email'] 
 }));
+// --- DATABASE ROUTE FOR INSTANT CREATION ---
+app.post('/api/create-room', async (req, res) => {
+    const { mode } = req.body;
+    const username = req.user ? req.user.username : "Guest"; 
+    const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
 
+    const initialData = {
+        mode: mode || '1v1',
+        players: [{ username, id: null }], // ID updated on socket connect
+        status: 'waiting'
+    };
+
+    try {
+        await pool.query(
+            'INSERT INTO rooms (room_code, room_data) VALUES ($1, $2)',
+            [roomCode, initialData]
+        );
+        res.json({ roomCode });
+    } catch (err) {
+        console.error("Room Creation Error:", err);
+        res.status(500).json({ error: "Could not create room" });
+    }
+});
+
+// --- SOCKET LOGIC ---
+io.on('connection', (socket) => {
+    socket.on('join_room', async ({ roomCode, username }) => {
+        socket.join(roomCode);
+        // Logic to update DB with player's socket.id goes here
+        io.to(roomCode).emit('player_joined', { username, roomCode });
+    });
+});
 // 2. This is where Google sends the user back
 app.get('/auth/google/callback', 
     passport.authenticate('google', { failureRedirect: '/signin' }),
