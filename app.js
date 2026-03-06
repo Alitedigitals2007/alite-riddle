@@ -6,7 +6,6 @@ require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
 
 // 1. NEON DATABASE CONNECTION
 const pool = new Pool({
@@ -218,11 +217,14 @@ function isLoggedIn(req, res, next) {
     res.redirect('/signin');
 }
 
-{
+// DELETE OR COMMENT OUT THIS ENTIRE SECTION
+const io = require('socket.io')(server, {
     connectionStateRecovery: {}, 
-    cors: { origin: "*", methods: ["GET", "POST"] }
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
 });
-
 // CREATE ROOM FIX
 socket.on('create_room', async (data) => {
     // Generate a 5-character clean code
