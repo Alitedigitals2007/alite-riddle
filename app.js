@@ -156,7 +156,56 @@ function isLoggedIn(req, res, next) {
     }
     res.redirect('/signin');
 }
+socket.on('create_room', async (data) => {
+    const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
+    
+    const initialData = {
+        mode: data.mode, // '1v1' or '2v2'
+        players: [{ id: socket.id, username: data.username }],
+        status: 'waiting'
+    };
+const io = require('socket.io')(server, {
+    connectionStateRecovery: {}, // This helps if the Vercel function blips
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+    try {
+        await pool.query(
+            'INSERT INTO rooms (room_code, room_data) VALUES ($1, $2)', 
+            [roomCode, JSON.stringify(initialData)]
+        );
+        socket.join(roomCode);
+        socket.emit('room_created', { roomCode });
+    } catch (err) {
+        console.error("Error creating room:", err);
+    }
+});
+socket.on('join_room', async (data) => {
+    const { roomCode, username } = data;
 
+    try {
+        const result = await pool.query('SELECT * FROM rooms WHERE room_code = $1', [roomCode]);
+
+        if (result.rows.length === 0) {
+            return socket.emit('error_message', 'Room not found or expired.');
+        }
+
+        let roomData = result.rows[0].room_data;
+        roomData.players.push({ id: socket.id, username: username });
+
+        // Update the room in the DB with the new player
+        await pool.query('UPDATE rooms SET room_data = $1 WHERE room_code = $2', 
+            [JSON.stringify(roomData), roomCode]);
+
+        socket.join(roomCode);
+        io.to(roomCode).emit('player_joined', roomData);
+        
+    } catch (err) {
+        console.error("Error joining room:", err);
+    }
+});
 app.get('/dashboard', isLoggedIn, async (req, res) => {
     try {
         // 1. Fetch Top 10 Players (Ranked by Level, then Points)
