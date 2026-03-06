@@ -1,144 +1,74 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Battle Lobby | Alite</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0f172a; color: white; }
-        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .slot { border: 2px dashed rgba(255,255,255,0.1); border-radius: 1.5rem; height: 80px; display: flex; align-items: center; padding: 0 1.5rem; transition: all 0.3s; }
-        .slot.filled { border-style: solid; border-color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
-        .pulse-cyan { animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    <meta charset="UTF-8">
+    <title>Alite Battle Lobby</title>
+    <link rel="stylesheet" href="/css/style.css"> <style>
+        .lobby-container { max-width: 500px; margin: 50px auto; text-align: center; padding: 20px; border-radius: 15px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); }
+        .btn { padding: 15px 30px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-create { background: #00ff88; color: #000; }
+        .btn-join { background: #00d4ff; color: #fff; }
+        input { padding: 12px; border-radius: 5px; border: 1px solid #ddd; width: 80%; margin-bottom: 10px; }
+        #status { margin-top: 20px; color: #ffcc00; font-style: italic; }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-6">
+<body>
 
-    <div id="selectionScreen" class="max-w-md w-full glass p-8 rounded-[3rem] text-center">
-        <h2 class="text-4xl font-black mb-2 italic">BATTLE <span class="text-cyan-500">LAB</span></h2>
-        <p class="text-slate-400 text-sm mb-10 font-bold uppercase tracking-widest">Select your combat mode</p>
+<div class="lobby-container">
+    <h1>BATTLE LOBBY</h1>
+    <p>Welcome, <strong><%= user.username %></strong></p>
+
+    <hr>
+
+    <h3>Create a Match</h3>
+    <button class="btn btn-create" onclick="handleCreate('1v1')">Start 1v1 Solo</button>
+    <button class="btn btn-create" onclick="handleCreate('2v2')">Start 2v2 Team</button>
+
+    <hr>
+
+    <h3>Join a Match</h3>
+    <input type="text" id="joinCode" placeholder="Enter Room Code (e.g. AB123)">
+    <button class="btn btn-join" onclick="handleJoin()">Join Battle</button>
+
+    <div id="status"></div>
+</div>
+
+<script>
+    const statusDiv = document.getElementById('status');
+
+    async function handleCreate(mode) {
+        statusDiv.innerText = "Generating secure room...";
         
-        <div class="grid grid-cols-1 gap-4">
-            <button onclick="createRoom('single')" class="group relative bg-white/5 hover:bg-cyan-600 p-6 rounded-[2rem] border border-white/10 transition-all text-left overflow-hidden">
-                <div class="relative z-10">
-                    <h3 class="font-black text-xl">1 vs 1 Solo</h3>
-                    <p class="text-xs text-slate-400 group-hover:text-cyan-100 font-bold">Classic Duel</p>
-                </div>
-                <div class="absolute right-[-10px] bottom-[-20px] text-7xl opacity-5 font-black italic">1v1</div>
-            </button>
+        try {
+            const response = await fetch('/api/create-room', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode })
+            });
 
-            <button onclick="createRoom('team')" class="group relative bg-white/5 hover:bg-indigo-600 p-6 rounded-[2rem] border border-white/10 transition-all text-left overflow-hidden">
-                <div class="relative z-10">
-                    <h3 class="font-black text-xl">2 vs 2 Squad</h3>
-                    <p class="text-xs text-slate-400 group-hover:text-indigo-100 font-bold">Co-op Battle</p>
-                </div>
-                <div class="absolute right-[-10px] bottom-[-20px] text-7xl opacity-5 font-black italic">2v2</div>
-            </button>
+            const data = await response.json();
 
-            <div class="py-4 flex items-center gap-4">
-                <div class="h-[1px] bg-white/10 flex-grow"></div>
-                <span class="text-[10px] font-black text-slate-500">OR JOIN WITH CODE</span>
-                <div class="h-[1px] bg-white/10 flex-grow"></div>
-            </div>
-
-            <div class="flex gap-2">
-                <input type="text" id="joinInput" placeholder="ROOM CODE" class="bg-slate-800 border-none rounded-2xl p-4 w-full font-black text-center tracking-widest uppercase focus:ring-2 ring-cyan-500 outline-none">
-                <button onclick="joinRoom()" class="bg-white text-slate-900 px-8 rounded-2xl font-black hover:scale-105 active:scale-95 transition">JOIN</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="lobbyScreen" class="hidden max-w-2xl w-full glass p-10 rounded-[3.5rem]">
-        <div class="flex justify-between items-start mb-12">
-            <div>
-                <h2 id="lobbyTitle" class="text-3xl font-black italic">LOBBY</h2>
-                <p id="playerCount" class="text-cyan-500 font-bold text-xs uppercase tracking-widest">Waiting for players...</p>
-            </div>
-            <div class="bg-slate-900 px-6 py-3 rounded-2xl border border-white/10 text-center">
-                <p class="text-[10px] font-black text-slate-500 uppercase leading-none">Room Code</p>
-                <p id="displayCode" class="text-2xl font-black text-cyan-400 tracking-tighter">-----</p>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="playerList">
-            </div>
-
-        <div class="mt-12 text-center">
-            <p class="text-xs text-slate-500 font-bold animate-pulse">MATCH WILL START AUTOMATICALLY WHEN FULL</p>
-            <button onclick="location.reload()" class="mt-6 text-slate-400 hover:text-white font-bold text-sm">Leave Lobby</button>
-        </div>
-    </div>
-
-    <div id="gameUI" class="hidden fixed inset-0 bg-slate-900">
-        </div>
-
-    <script>
-        const socket = io();
-        const userId = '<%= user.id %>';
-        const username = '<%= user.username %>';
-        let currentRoomId = null;
-
-        // --- ACTIONS ---
-        function createRoom(type) {
-            socket.emit('createRoom', { type, userId, username });
-        }
-
-        function joinRoom() {
-            const code = document.getElementById('joinInput').value.trim().toUpperCase();
-            if (code) socket.emit('joinRoom', { roomId: code, userId, username });
-        }
-
-        // --- SOCKET LISTENERS ---
-        socket.on('roomCreated', (data) => {
-            showLobby(data.roomId, data.lobbyType);
-        });
-
-        socket.on('playerJoined', (data) => {
-            updateLobbyList(data.players, data.maxPlayers);
-        });
-
-        socket.on('error', (msg) => alert(msg));
-
-        socket.on('matchStarted', (data) => {
-            document.getElementById('lobbyScreen').classList.add('hidden');
-            document.getElementById('gameUI').classList.remove('hidden');
-            // Initialize your game logic here
-            console.log("Game Starting with riddles:", data.riddles);
-        });
-
-        // --- UI HELPERS ---
-        function showLobby(code, type) {
-            currentRoomId = code;
-            document.getElementById('selectionScreen').classList.add('hidden');
-            document.getElementById('lobbyScreen').classList.remove('hidden');
-            document.getElementById('displayCode').innerText = code;
-            document.getElementById('lobbyTitle').innerText = type === 'single' ? 'DUEL LOBBY' : 'SQUAD LOBBY';
-            
-            const max = type === 'single' ? 2 : 4;
-            updateLobbyList([{ username, userId }], max);
-        }
-
-        function updateLobbyList(players, max) {
-            const list = document.getElementById('playerList');
-            list.innerHTML = '';
-            document.getElementById('playerCount').innerText = `${players.length} / ${max} Players Ready`;
-
-            for (let i = 0; i < max; i++) {
-                const player = players[i];
-                const slot = document.createElement('div');
-                slot.className = `slot ${player ? 'filled' : ''}`;
-                
-                slot.innerHTML = player 
-                    ? `<div class="w-10 h-10 bg-cyan-500 rounded-lg flex items-center justify-center font-black mr-4">${player.username[0].toUpperCase()}</div>
-                       <div><p class="font-black">${player.username}</p><p class="text-[10px] text-cyan-400 font-bold uppercase tracking-tighter">READY</p></div>`
-                    : `<div class="w-10 h-10 bg-white/5 rounded-lg mr-4"></div>
-                       <p class="text-slate-600 font-bold text-sm italic">Waiting...</p>`;
-                
-                list.appendChild(slot);
+            if (data.roomCode) {
+                statusDiv.innerText = "Room secured! Entering arena...";
+                // Redirect to arena with the code
+                window.location.href = `/arena?code=${data.roomCode}`;
+            } else {
+                statusDiv.innerText = "Error: " + data.error;
             }
+        } catch (err) {
+            statusDiv.innerText = "Connection failed. Check your internet.";
         }
-    </script>
+    }
+
+    function handleJoin() {
+        const code = document.getElementById('joinCode').value.trim().toUpperCase();
+        if (code.length < 3) {
+            alert("Please enter a valid room code.");
+            return;
+        }
+        window.location.href = `/arena?code=${code}`;
+    }
+</script>
+
 </body>
 </html>
