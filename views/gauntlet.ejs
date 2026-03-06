@@ -219,17 +219,49 @@
                 });
             } catch (e) { console.error("Settlement error"); }
         }
+async function triggerVictory() {
+    gameActive = false;
+    
+    // Add an Efficiency Bonus: 1 extra XP for every 5% power remaining
+    const bonusXp = Math.floor(power / 5);
+    const finalSessionXp = totalXp + bonusXp;
 
-        async function triggerVictory() {
-            gameActive = false;
-            await settle('win');
-            document.getElementById('gameCard').innerHTML = `
-                <div class="bg-white rounded-[3rem] p-12 text-center shadow-2xl border-4 border-cyan-400">
-                    <h2 class="text-4xl font-black text-slate-900 mb-2">GAUNTLET CLEARED</h2>
-                    <p class="text-cyan-600 font-bold text-2xl mb-8">+${totalXp} XP EARNED</p>
-                    <a href="/dashboard" class="bg-cyan-600 text-white px-10 py-4 rounded-2xl font-black hover:scale-105 transition inline-block">FINISH SESSION</a>
-                </div>`;
-        }
+    // Send the final data to the app.js route
+    const response = await settle('win', finalSessionXp);
+
+    document.getElementById('gameCard').innerHTML = `
+        <div class="bg-white rounded-[3rem] p-12 text-center shadow-2xl border-4 border-cyan-400 floating-card">
+            <div class="text-6xl mb-6">🏆</div>
+            <h2 class="text-4xl font-black text-slate-900 mb-2">GAUNTLET CLEARED</h2>
+            <div class="flex justify-center gap-4 mb-8">
+                <div class="bg-cyan-50 p-4 rounded-2xl">
+                    <span class="block text-[10px] uppercase font-black text-cyan-600">Base XP</span>
+                    <span class="text-2xl font-black">${totalXp}</span>
+                </div>
+                <div class="bg-amber-50 p-4 rounded-2xl">
+                    <span class="block text-[10px] uppercase font-black text-amber-600">Bonus</span>
+                    <span class="text-2xl font-black">+${bonusXp}</span>
+                </div>
+            </div>
+            <button onclick="window.location.href='/dashboard'" class="bg-cyan-600 text-white px-10 py-4 rounded-2xl font-black hover:scale-105 transition shadow-lg shadow-cyan-200 w-full">
+                COLLECT ${finalSessionXp} XP
+            </button>
+        </div>`;
+}
+
+// Helper to handle the API call
+async function settle(status, xpAmount) {
+    try {
+        const res = await fetch('/api/gauntlet/settle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ xp: xpAmount, status: status })
+        });
+        return await res.json();
+    } catch (e) {
+        console.error("Settlement failed", e);
+    }
+}
 
         async function triggerLoss() {
             gameActive = false;
