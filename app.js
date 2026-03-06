@@ -224,222 +224,6 @@ app.get('/battle', isLoggedIn, async (req, res) => {
         res.redirect('/dashboard');
     }
 });
-// --- BATTLE ARENA SOCKET LOGIC ---
-let waitingPlayer = null;
-
-io.on('connection', (socket) => {
-    socket.on('findMatch', async (data) => {
-        // Prevent matching with self
-        if (waitingPlayer && waitingPlayer.userId !== data.userId) {
-            const room = `room_${waitingPlayer.userId}_${data.userId}`;
-            const opponent = waitingPlayer;
-
-            socket.join(room);
-            opponent.socket.join(room);
-
-            // Fetch 5 random riddles
-            const riddles = await pool.query('SELECT * FROM riddles ORDER BY RANDOM() LIMIT 5');
-
-            io.to(room).emit('matchStarted', {
-                room: room,
-                riddles: riddles.rows,
-                opponentName: opponent.username,
-                opponentId: opponent.userId
-            });
-            waitingPlayer = null;
-        } else {
-            waitingPlayer = { 
-                socket: socket, 
-                userId: data.userId, 
-                username: data.username 
-            };
-        }
-    });
-
-    // RELAY: When you answer, tell your opponent to show the "Glow"
-    socket.on('send-answer', (data) => {
-        socket.to(data.roomId).emit('opponent-answered', {
-            newScore: data.newScore,
-            isCorrect: data.isCorrect
-        });
-    });
-
-    // FINAL: Inject points into DB
-    socket.on('battleComplete', async (data) => {
-        const { userId, pointsWon } = data;
-        try {
-            await pool.query('UPDATE users SET points = points + $1 WHERE id = $2', [pointsWon, userId]);
-            const userRes = await pool.query('SELECT points FROM users WHERE id = $1', [userId]);
-            socket.emit('pointsUpdated', { newTotal: userRes.rows[0].points });
-        } catch (err) {
-            console.error("Battle DB Error:", err);
-        }
-    });
-
-    socket.on('disconnect', () => {
-        if (waitingPlayer && waitingPlayer.socket.id === socket.id) waitingPlayer = null;
-    });
-});
-// --- LOBBY SYSTEM STORAGE ---
-let lobbies = {}; 
-
-io.on('connection', (socket) => {
-    
-    // 1. Create a Room
-    socket.on('createRoom', (data) => {
-        const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
-        const lobbyType = data.type; // 'single' or 'team'
-        
-        lobbies[roomId] = {
-            id: roomId,
-            type: lobbyType,
-            creator: data.username,
-            players: [{ id: socket.id, username: data.username, userId: data.userId, team: 'A' }],
-            status: 'waiting'
-        };
-
-        socket.join(roomId);
-        socket.emit('roomCreated', { roomId, lobbyType });
-    });
-
-    // 2. Join a Room
-    socket.on('joinRoom', (data) => {
-        const room = lobbies[data.roomId];
-        
-        if (room && room.status === 'waiting') {
-            // Check if room is full (2 for single, 4 for team)
-            const maxPlayers = room.type === 'single' ? 2 : 4;
-            
-            if (room.players.length < maxPlayers) {
-                const team = room.players.length % 2 === 0 ? 'A' : 'B';
-                room.players.push({ id: socket.id, username: data.username, userId: data.userId, team });
-                
-                socket.join(data.roomId);
-                io.to(data.roomId).emit('playerJoined', { players: room.players });
-
-                // Auto-start if full
-                if (room.players.length === maxPlayers) {
-                    room.status = 'playing';
-                    startMatch(data.roomId, room);
-                }
-            } else {
-                socket.emit('error', 'Room is full!');
-            }
-        } else {
-            socket.emit('error', 'Room not found!');
-        }
-    });
-
-    async function startMatch(roomId, room) {
-        const riddles = await pool.query('SELECT * FROM riddles ORDER BY RANDOM() LIMIT 5');
-        io.to(roomId).emit('matchStarted', { riddles: riddles.rows, type: room.type });
-    }
-
-    // 3. Real-time Score Relay (Now supports Team Aggregation)
-    socket.on('send-answer', (data) => {
-        // In Team mode, this broadcasts the score to teammates and enemies alike
-        socket.to(data.roomId).emit('opponent-answered', {
-            userId: data.userId,
-            newScore: data.newScore,
-            team: data.team
-        });
-    });
-});
-// Global storage for active lobbies
-const activeLobbies = {};
-
-io.on('connection', (socket) => {
-    
-    // --- CREATE ROOM ---
-    socket.on('createRoom', async (data) => {
-        // Generate a 5-digit unique code
-        const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
-        
-        activeLobbies[roomId] = {
-            roomId: roomId,
-            type: data.type, // 'single' or 'team'
-            players: [{ 
-                id: socket.id, 
-                userId: data.userId, 
-                username: data.username, 
-                team: 'A', 
-                score: 0 
-            }],
-            status: 'waiting'
-        };
-
-        socket.join(roomId);
-        socket.emit('roomCreated', { roomId, lobbyType: data.type });
-    });
-
-    // --- JOIN ROOM ---
-    socket.on('joinRoom', async (data) => {
-        const room = activeLobbies[data.roomId];
-
-        if (room && room.status === 'waiting') {
-            const maxPlayers = room.type === 'single' ? 2 : 4;
-
-            if (room.players.length < maxPlayers) {
-                // Assign Teams: Players 1 & 3 are Team A, Players 2 & 4 are Team B
-                const team = (room.players.length % 2 === 0) ? 'A' : 'B';
-                
-                room.players.push({ 
-                    id: socket.id, 
-                    userId: data.userId, 
-                    username: data.username, 
-                    team: team, 
-                    score: 0 
-                });
-
-                socket.join(data.roomId);
-
-                // Check if match should start
-                if (room.players.length === maxPlayers) {
-                    room.status = 'playing';
-                    
-                    // FETCH RANDOM QUESTIONS FROM DB
-                    const riddleRes = await pool.query('SELECT * FROM riddles ORDER BY RANDOM() LIMIT 5');
-                    
-                    io.to(data.roomId).emit('matchStarted', {
-                        roomId: data.roomId,
-                        riddles: riddleRes.rows,
-                        type: room.type,
-                        players: room.players // Clients use this to see who is on which team
-                    });
-                } else {
-                    io.to(data.roomId).emit('playerJoined', { count: room.players.length });
-                }
-            } else {
-                socket.emit('error', 'Room is full!');
-            }
-        } else {
-            socket.emit('error', 'Invalid Room Code');
-        }
-    });
-
-    // --- REAL-TIME SCORE RELAY ---
-    socket.on('send-answer', (data) => {
-        const room = activeLobbies[data.roomId];
-        if (!room) return;
-
-        // Find the player in the lobby and update their individual score
-        const player = room.players.find(p => p.id === socket.id);
-        if (player) player.score = data.newScore;
-
-        // Calculate Team Totals
-        const teamAScore = room.players.filter(p => p.team === 'A').reduce((sum, p) => sum + p.score, 0);
-        const teamBScore = room.players.filter(p => p.team === 'B').reduce((sum, p) => sum + p.score, 0);
-
-        // Broadcast the update to everyone else in the room
-        socket.to(data.roomId).emit('opponent-answered', {
-            senderId: data.userId,
-            isCorrect: data.isCorrect,
-            teamAScore: teamAScore,
-            teamBScore: teamBScore,
-            individualScore: data.newScore
-        });
-    });
-});
 
 // --- 1. SOLO GAME ROUTE ---
 app.get('/solo', isLoggedIn, async (req, res) => {
@@ -580,6 +364,31 @@ app.get('/api/gauntlet/start', async (req, res) => {
     }
 });
 
+// --- GET RANDOM RIDDLES ---
+app.get('/api/gauntlet/start', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM riddles ORDER BY RANDOM() LIMIT 10');
+        res.json({ success: true, riddles: result.rows });
+    } catch (err) {
+        res.status(500).json({ error: "DB Error" });
+    }
+});
+
+// --- UPDATE PROGRESS ON WIN ---
+app.post('/api/gauntlet/win', async (req, res) => {
+    if (!req.user) return res.status(401).json({ error: "Not logged in" });
+
+    try {
+        // Boost Level and XP for Alite users
+        await pool.query(
+            'UPDATE users SET current_level = current_level + 1, points = points + 100 WHERE id = $1',
+            [req.user.id]
+        );
+        res.json({ success: true, message: "Level Up!" });
+    } catch (err) {
+        res.status(500).json({ error: "Could not save progress" });
+    }
+});
 // 5. START SERVER
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
