@@ -691,6 +691,31 @@ app.get('/api/scoreboard', async (req, res) => {
         res.status(500).json([]);
     }
 });
+// --- THE GAUNTLET: FETCH RANDOM RIDDLES ---
+app.get('/api/gauntlet/start', async (req, res) => {
+    try {
+        // 1. Try to fetch 10 random riddles from Neon
+        const result = await pool.query('SELECT * FROM riddles ORDER BY RANDOM() LIMIT 10');
+        
+        if (result.rows.length > 0) {
+            return res.json({ success: true, riddles: result.rows });
+        }
+
+        // 2. Fallback Riddles (If DB is empty)
+        const fallbackRiddles = [
+            { question: "What falls but never breaks, and what breaks but never falls?", answer: "Night and Day" },
+            { question: "I have keys, but no locks. I have a space, but no room. What am I?", answer: "Keyboard" },
+            { question: "If a projectile is fired at 45 degrees, what is maximized?", answer: "Range" },
+            { question: "The more of me there is, the less you see. What am I?", answer: "Darkness" }
+        ];
+        
+        res.json({ success: true, riddles: fallbackRiddles.sort(() => Math.random() - 0.5) });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to load Gauntlet" });
+    }
+});
 
 // 5. START SERVER
 const PORT = process.env.PORT || 3000;
