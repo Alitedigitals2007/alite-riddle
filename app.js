@@ -8,8 +8,6 @@ const db = new Pool({
         rejectUnauthorized: false // Required for most cloud DBs like Neon or Render
     }
 });
-
-// Optional: Test the connection on startup
 db.connect((err, client, release) => {
     if (err) {
         return console.error('❌ Database connection failed:', err.stack);
