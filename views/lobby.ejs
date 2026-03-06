@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Alite Battle Lobby</title>
+    <link rel="stylesheet" href="/css/style.css"> <style>
+        .lobby-container { max-width: 500px; margin: 50px auto; text-align: center; padding: 20px; border-radius: 15px; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); }
+        .btn { padding: 15px 30px; margin: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        .btn-create { background: #00ff88; color: #000; }
+        .btn-join { background: #00d4ff; color: #fff; }
+        input { padding: 12px; border-radius: 5px; border: 1px solid #ddd; width: 80%; margin-bottom: 10px; }
+        #status { margin-top: 20px; color: #ffcc00; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div class="lobby-container">
+    <h1>BATTLE LOBBY</h1>
+    <p>Welcome, <strong><%= user.username %></strong></p>
+
+    <hr>
+
+    <h3>Create a Match</h3>
+    <button class="btn btn-create" onclick="handleCreate('1v1')">Start 1v1 Solo</button>
+    <button class="btn btn-create" onclick="handleCreate('2v2')">Start 2v2 Team</button>
+
+    <hr>
+
+    <h3>Join a Match</h3>
+    <input type="text" id="joinCode" placeholder="Enter Room Code (e.g. AB123)">
+    <button class="btn btn-join" onclick="handleJoin()">Join Battle</button>
+
+    <div id="status"></div>
+</div>
+
+<script>
+    const statusDiv = document.getElementById('status');
+
+    async function handleCreate(mode) {
+        statusDiv.innerText = "Generating secure room...";
+        
+        try {
+            const response = await fetch('/api/create-room', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode })
+            });
+
+            const data = await response.json();
+
+            if (data.roomCode) {
+                statusDiv.innerText = "Room secured! Entering arena...";
+                // Redirect to arena with the code
+                window.location.href = `/arena?code=${data.roomCode}`;
+            } else {
+                statusDiv.innerText = "Error: " + data.error;
+            }
+        } catch (err) {
+            statusDiv.innerText = "Connection failed. Check your internet.";
+        }
+    }
+
+    function handleJoin() {
+        const code = document.getElementById('joinCode').value.trim().toUpperCase();
+        if (code.length < 3) {
+            alert("Please enter a valid room code.");
+            return;
+        }
+        window.location.href = `/arena?code=${code}`;
+    }
+</script>
+
+</body>
+</html>
