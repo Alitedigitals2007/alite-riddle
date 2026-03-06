@@ -2,102 +2,110 @@
 <html lang="en">
 <head>
     <title>Dashboard | Alite Riddles</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f0f9ff; color: #1e293b; }
-        .bento { background: white; border: 1px solid #e0f2fe; border-radius: 2.5rem; padding: 2rem; transition: all 0.3s ease; }
+        .bento { background: white; border: 1px solid #e0f2fe; border-radius: 2rem; padding: 1.5rem; transition: all 0.3s ease; }
+        @media (min-width: 768px) { .bento { border-radius: 2.5rem; padding: 2rem; } }
         .bento:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05); }
         .cyan-glow { box-shadow: 0 0 20px rgba(6, 182, 212, 0.2); }
+        /* Custom scrollbar for mobile */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #06b6d4; border-radius: 10px; }
     </style>
 </head>
 <body class="pb-10">
 
-    <nav class="max-w-6xl mx-auto p-8 flex justify-between items-center">
-        <div class="text-2xl font-black tracking-tighter text-slate-900">ALITE<span class="text-cyan-500">.</span></div>
-        <div class="flex items-center gap-4 bg-white px-4 py-2 rounded-2xl border border-slate-100 shadow-sm">
-            <span class="text-sm font-bold text-slate-500">Master <%= user.username %></span>
-            <div class="h-10 w-10 rounded-xl bg-cyan-500 text-white flex items-center justify-center font-black shadow-lg shadow-cyan-200">
+    <nav class="max-w-6xl mx-auto p-6 md:p-8 flex justify-between items-center">
+        <div class="text-xl md:text-2xl font-black tracking-tighter text-slate-900">ALITE<span class="text-cyan-500">.</span></div>
+        <div class="flex items-center gap-3 bg-white px-3 py-1.5 md:px-4 md:py-2 rounded-2xl border border-slate-100 shadow-sm">
+            <span class="hidden md:inline text-sm font-bold text-slate-500">Master <%= user.username %></span>
+            <div class="h-8 w-8 md:h-10 md:w-10 rounded-xl bg-cyan-500 text-white flex items-center justify-center font-black shadow-lg shadow-cyan-200 text-sm md:text-base">
                 <%= user.username.charAt(0).toUpperCase() %>
             </div>
         </div>
     </nav>
 
-    <main class="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+    <main class="max-w-6xl mx-auto px-4 md:px-6 grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6">
         
-        <div class="md:col-span-8 bento bg-slate-900 text-white border-none flex flex-col justify-between min-h-[320px] relative overflow-hidden cyan-glow">
-            <div class="absolute -top-10 -right-10 p-8 opacity-10 text-[12rem] font-black rotate-12 select-none">Q</div>
-            <div>
-                <span class="bg-cyan-500/20 text-cyan-400 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest border border-cyan-500/30">Campaign Mode</span>
-                <h2 class="text-5xl font-extrabold mt-6 mb-2 leading-tight">Conquer<br>Level <%= user.current_level %></h2>
-                <p class="text-slate-400 font-medium">Global Ranking: <span class="text-cyan-400 font-black">#<%= rank %></span></p>
+        <div class="md:col-span-8 bento bg-slate-900 text-white border-none flex flex-col justify-between min-h-[280px] md:min-h-[320px] relative overflow-hidden cyan-glow">
+            <div class="absolute -top-10 -right-10 p-8 opacity-10 text-[8rem] md:text-[12rem] font-black rotate-12 select-none">Q</div>
+            <div class="relative z-10">
+                <span class="bg-cyan-500/20 text-cyan-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-cyan-500/30">Survival Mode</span>
+                <h2 class="text-3xl md:text-5xl font-extrabold mt-4 md:mt-6 mb-2 leading-tight">Enter The<br>Gauntlet</h2>
+                <p class="text-slate-400 text-sm md:text-base font-medium">Global Ranking: <span class="text-cyan-400 font-black">#<%= rank %></span></p>
             </div>
-            <div class="flex gap-4 relative z-10">
-                <a href="/level-map" class="bg-cyan-500 px-10 py-5 rounded-2xl font-black text-white hover:bg-cyan-400 transition shadow-xl shadow-cyan-900/40 hover:scale-105 active:scale-95">
-                    🎮 OPEN MAP
+            <div class="flex flex-col sm:flex-row gap-3 mt-6 relative z-10">
+                <a href="/gauntlet" class="w-full sm:w-auto text-center bg-cyan-500 px-8 py-4 md:px-10 md:py-5 rounded-2xl font-black text-white hover:bg-cyan-400 transition shadow-xl shadow-cyan-900/40 hover:scale-105 active:scale-95">
+                    ⚡ START GAUNTLET
                 </a>
-                <a href="/battle" class="bg-white/10 backdrop-blur-md text-white px-8 py-5 rounded-2xl font-black hover:bg-white/20 transition border border-white/10">
-                    ⚔️ 1v1 BATTLE
+                <a href="/level-map" class="w-full sm:w-auto text-center bg-white/10 backdrop-blur-md text-white px-8 py-4 md:py-5 rounded-2xl font-black hover:bg-white/20 transition border border-white/10 text-sm md:text-base">
+                    🗺️ LEVEL MAP
                 </a>
             </div>
         </div>
 
         <div class="md:col-span-4 bento flex flex-col justify-center text-center border-b-8 border-cyan-500">
-            <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Campaign Rank</p>
-            <p class="text-7xl font-black text-slate-900 tracking-tighter"><span class="text-cyan-500 text-4xl">LVL</span><%= user.current_level %></p>
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Campaign Rank</p>
+            <p class="text-5xl md:text-7xl font-black text-slate-900 tracking-tighter"><span class="text-cyan-500 text-2xl md:text-4xl">LVL</span><%= user.current_level %></p>
             <div class="mt-4 w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <div class="bg-cyan-500 h-full" style="width: <%= (user.current_level / 100) * 100 %>%"></div>
+                <div class="bg-cyan-500 h-full transition-all duration-1000" style="width: <%= (user.current_level / 100) * 100 %>%"></div>
             </div>
         </div>
 
-        <div class="md:col-span-4 bento text-center">
-            <p class="text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">Total Points</p>
-            <p class="text-3xl font-black text-slate-900"><%= user.points %> <span class="text-sm text-slate-300">XP</span></p>
-        </div>
-
-        <div class="md:col-span-4 bento text-center">
-            <p class="text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">Global Status</p>
-            <div class="flex items-center justify-center gap-2">
-                <div class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
-                <p class="text-3xl font-black text-emerald-600 uppercase">Online</p>
+        <div class="grid grid-cols-2 md:grid-cols-12 md:col-span-12 gap-4 md:gap-6">
+            <div class="md:col-span-4 bento text-center flex flex-col justify-center py-6 md:py-8">
+                <p class="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Total Points</p>
+                <p class="text-2xl md:text-3xl font-black text-slate-900"><%= user.points %> <span class="text-xs text-slate-300">XP</span></p>
             </div>
-        </div>
 
-        <div class="md:col-span-4 bento text-center">
-            <p class="text-xs font-black text-slate-400 uppercase mb-2 tracking-widest">Completion</p>
-            <p class="text-3xl font-black text-slate-900"><%= user.current_level - 1 %>%</p>
-        </div>
-
-        <div class="md:col-span-12 bento">
-            <div class="flex justify-between items-end mb-8">
-                <div>
-                    <h3 class="font-black text-2xl text-slate-900">Top Adventurers</h3>
-                    <p class="text-slate-400 text-sm font-bold uppercase tracking-widest">Ranked by Campaign Progress</p>
+            <div class="md:col-span-4 bento text-center flex flex-col justify-center py-6 md:py-8">
+                <p class="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Status</p>
+                <div class="flex items-center justify-center gap-2">
+                    <div class="w-2 h-2 md:w-3 md:h-3 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <p class="text-2xl md:text-3xl font-black text-emerald-600 uppercase">Live</p>
                 </div>
-                <div class="text-right">
+            </div>
+
+            <div class="col-span-2 md:col-span-4 bento text-center flex flex-col justify-center py-6 md:py-8">
+                <p class="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Completion</p>
+                <p class="text-2xl md:text-3xl font-black text-slate-900"><%= user.current_level - 1 %>%</p>
+            </div>
+        </div>
+
+        <div class="md:col-span-12 bento mt-2">
+            <div class="flex flex-col sm:flex-row justify-between sm:items-end mb-6 gap-4">
+                <div>
+                    <h3 class="font-black text-xl md:text-2xl text-slate-900">Top Adventurers</h3>
+                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Ranked by Campaign Progress</p>
+                </div>
+                <div class="hidden sm:block text-right">
                     <span class="text-[10px] font-black bg-slate-100 text-slate-500 px-3 py-1 rounded-full">LIVE UPDATES</span>
                 </div>
             </div>
             
             <div class="space-y-3">
                 <% leaders.forEach((leader, index) => { %>
-                    <div class="flex justify-between items-center p-6 <%= leader.username === user.username ? 'bg-cyan-50 border-2 border-cyan-100 ring-4 ring-cyan-50' : 'bg-slate-50/50 border border-slate-100' %> rounded-[2rem] transition-all hover:bg-white hover:shadow-md group">
-                        <div class="flex items-center gap-5">
-                            <span class="font-black <%= index < 3 ? 'text-cyan-500' : 'text-slate-300' %> text-xl w-8">#<%= index + 1 %></span>
-                            <div class="h-12 w-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center font-black text-slate-400 group-hover:border-cyan-200 transition">
+                    <div class="flex justify-between items-center p-4 md:p-6 <%= leader.username === user.username ? 'bg-cyan-50 border-2 border-cyan-100 ring-2 ring-cyan-50' : 'bg-slate-50/50 border border-slate-100' %> rounded-2xl md:rounded-[2rem] transition-all hover:bg-white hover:shadow-md group">
+                        <div class="flex items-center gap-3 md:gap-5">
+                            <span class="font-black <%= index < 3 ? 'text-cyan-500' : 'text-slate-300' %> text-base md:text-xl w-6 md:w-8">#<%= index + 1 %></span>
+                            <div class="h-10 w-10 md:h-12 md:w-12 rounded-xl md:rounded-2xl bg-white border border-slate-200 flex items-center justify-center font-black text-slate-400 group-hover:border-cyan-200 transition text-sm">
                                 <%= leader.username.charAt(0).toUpperCase() %>
                             </div>
                             <div>
-                                <span class="font-black text-slate-900 text-lg block"><%= leader.username %></span>
-                                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Verified Player</span>
+                                <span class="font-black text-slate-900 text-sm md:text-lg block truncate max-w-[100px] md:max-w-none"><%= leader.username %></span>
+                                <span class="hidden md:block text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Verified Player</span>
                             </div>
                             <% if(leader.username === user.username) { %>
-                                <span class="text-[10px] bg-cyan-600 text-white px-3 py-1 rounded-full uppercase font-black tracking-widest ml-2">YOU</span>
+                                <span class="text-[8px] md:text-[10px] bg-cyan-600 text-white px-2 py-0.5 md:px-3 md:py-1 rounded-full uppercase font-black tracking-widest ml-1">YOU</span>
                             <% } %>
                         </div>
                         <div class="text-right">
-                            <span class="font-black text-cyan-600 text-2xl">LVL <%= leader.current_level %></span>
-                            <p class="text-[10px] font-bold text-slate-300 uppercase leading-none mt-1"><%= leader.points %> PTS</p>
+                            <span class="font-black text-cyan-600 text-lg md:text-2xl">L<%= leader.current_level %></span>
+                            <p class="hidden sm:block text-[10px] font-bold text-slate-300 uppercase leading-none mt-1"><%= leader.points %> PTS</p>
                         </div>
                     </div>
                 <% }) %>
