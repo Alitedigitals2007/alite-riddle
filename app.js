@@ -364,7 +364,7 @@ app.get('/api/gauntlet/start', async (req, res) => {
     }
 });
 
-// --- GET RANDOM RIDDLES ---
+// GET RIDDLES
 app.get('/api/gauntlet/start', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM riddles ORDER BY RANDOM() LIMIT 10');
@@ -374,21 +374,20 @@ app.get('/api/gauntlet/start', async (req, res) => {
     }
 });
 
-// --- UPDATE PROGRESS ON WIN ---
+// SAVE POINTS
 app.post('/api/gauntlet/win', async (req, res) => {
-    if (!req.user) return res.status(401).json({ error: "Not logged in" });
-
+    if (!req.user) return res.status(401).json({ error: "Unauthorized" });
     try {
-        // Boost Level and XP for Alite users
         await pool.query(
-            'UPDATE users SET current_level = current_level + 1, points = points + 100 WHERE id = $1',
+            'UPDATE users SET points = points + 100, current_level = current_level + 1 WHERE id = $1',
             [req.user.id]
         );
-        res.json({ success: true, message: "Level Up!" });
+        res.json({ success: true, xpEarned: 100 });
     } catch (err) {
-        res.status(500).json({ error: "Could not save progress" });
+        res.status(500).json({ error: "Failed to save points" });
     }
 });
+
 // This tells the server: "When someone visits /gauntlet, show them the gauntlet page"
 app.get('/gauntlet', (req, res) => {
     // Ensure the user is logged in before they can play
