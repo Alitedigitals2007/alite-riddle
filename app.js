@@ -2,6 +2,21 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const { Pool } = require('pg');
+const db = new Pool({
+    connectionString: process.env.DATABASE_URL, // Your Neon/Postgres link from .env
+    ssl: {
+        rejectUnauthorized: false // Required for most cloud DBs like Neon or Render
+    }
+});
+
+// Optional: Test the connection on startup
+db.connect((err, client, release) => {
+    if (err) {
+        return console.error('❌ Database connection failed:', err.stack);
+    }
+    console.log('✅ Gauntlet System Linked to PostgreSQL');
+    release();
+});
 require('dotenv').config();
 
 const app = express();
