@@ -1,121 +1,159 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gauntlet Mode | Alite</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #020617; color: white; overflow: hidden; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #020617; color: white; overflow-x: hidden; }
         .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .progress-bar { height: 20px; border-radius: 10px; transition: width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .progress-bar { height: 100%; transition: width 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .cyber-glow { box-shadow: 0 0 20px rgba(6, 182, 212, 0.3); }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        .shake { animation: shake 0.2s ease-in-out 0s 2; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center p-4">
+<body class="min-h-screen flex flex-col items-center justify-center p-4 md:p-8">
 
-    <div class="w-full max-w-2xl mb-8">
-        <div class="flex justify-between mb-2 text-[10px] font-black tracking-widest uppercase">
-            <span class="text-cyan-400">ALITE (YOU)</span>
+    <div class="w-full max-w-2xl mb-6 md:mb-10">
+        <div class="flex justify-between mb-3 text-[10px] font-black tracking-widest uppercase px-2">
+            <span class="text-cyan-400">PLAYER: <%= user.username %></span>
             <span class="text-red-500">CYBER-BOSS</span>
         </div>
-        <div class="w-full h-6 bg-slate-900 rounded-full overflow-hidden border border-white/10 cyber-glow">
+        <div class="w-full h-4 md:h-6 bg-slate-900 rounded-full overflow-hidden border border-white/10 cyber-glow">
             <div id="playerBar" class="progress-bar bg-gradient-to-r from-cyan-600 to-cyan-400 w-1/2"></div>
         </div>
     </div>
 
-    <div id="gameCard" class="max-w-xl w-full glass p-10 rounded-[3rem] text-center relative">
-        <div id="timer" class="absolute top-[-20px] left-1/2 -translate-x-1/2 bg-cyan-500 px-6 py-2 rounded-full font-black text-slate-900 text-sm">
-            WAKING UP...
+    <div id="gameCard" class="max-w-2xl w-full glass p-6 md:p-12 rounded-[2rem] md:rounded-[3rem] text-center relative transition-all">
+        <div id="streakBadge" class="absolute top-[-15px] left-1/2 -translate-x-1/2 bg-cyan-500 px-5 py-1.5 rounded-full font-black text-slate-900 text-xs md:text-sm tracking-tighter">
+            WAKING SYSTEM...
         </div>
 
-        <h3 id="questionText" class="text-2xl font-black mb-8 italic leading-tight">Preparing the Gauntlet...</h3>
+        <h3 id="questionText" class="text-xl md:text-3xl font-black mb-8 md:mb-12 italic leading-tight px-2">
+            INITIALIZING THE GAUNTLET...
+        </h3>
 
-        <div class="flex gap-2">
-            <input type="text" id="answerInput" placeholder="TYPE YOUR ANSWER..." 
-                   class="bg-slate-800 border-none rounded-2xl p-5 w-full font-bold text-center outline-none focus:ring-2 ring-cyan-500">
-            <button onclick="checkAnswer()" class="bg-white text-slate-900 px-8 rounded-2xl font-black hover:scale-105 transition">SUBMIT</button>
-        </div>
+        <div id="optionsContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+            </div>
         
-        <p id="feedback" class="mt-6 text-xs font-bold uppercase tracking-widest opacity-0">Correct!</p>
+        <p id="feedback" class="mt-8 text-xs font-black uppercase tracking-widest opacity-0 transition-opacity">READY</p>
     </div>
 
     <script>
         let riddles = [];
         let currentIndex = 0;
-        let power = 50; // Starts at 50%
+        let power = 50;
         let gameActive = false;
+        const alphabetMap = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
 
         async function startGauntlet() {
-            const res = await fetch('/api/gauntlet/start');
-            const data = await res.json();
-            riddles = data.riddles;
-            gameActive = true;
-            showRiddle();
-            startDrain();
+            try {
+                const res = await fetch('/api/gauntlet/start');
+                const data = await res.json();
+                riddles = data.riddles;
+                if (!riddles.length) throw new Error();
+                
+                gameActive = true;
+                showRiddle();
+                startDrain();
+            } catch (err) {
+                document.getElementById('questionText').innerText = "FAILED TO CONNECT TO LAB.";
+            }
         }
 
         function showRiddle() {
             if (currentIndex >= riddles.length) {
-                endGame(true);
+                victory();
                 return;
             }
-            document.getElementById('questionText').innerText = riddles[currentIndex].question;
-            document.getElementById('answerInput').value = '';
-            document.getElementById('answerInput').focus();
+
+            const current = riddles[currentIndex];
+            document.getElementById('questionText').innerText = current.question;
+            document.getElementById('streakBadge').innerText = `STREAK: ${currentIndex}`;
+            
+            const container = document.getElementById('optionsContainer');
+            container.innerHTML = ''; 
+
+            current.options.forEach((optionText, index) => {
+                const btn = document.createElement('button');
+                const label = ['A', 'B', 'C', 'D'][index];
+                
+                btn.className = "group relative bg-white/5 hover:bg-cyan-600 border border-white/10 p-5 md:p-6 rounded-2xl font-bold transition-all hover:scale-[1.02] text-sm md:text-base text-left flex items-center";
+                btn.innerHTML = `
+                    <span class="mr-4 bg-white/10 w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black group-hover:bg-white group-hover:text-cyan-600 transition-colors">${label}</span>
+                    <span class="flex-1">${optionText}</span>
+                `;
+                
+                btn.onclick = () => checkChoice(index);
+                container.appendChild(btn);
+            });
         }
 
-        function checkAnswer() {
+        function checkChoice(selectedIndex) {
             if (!gameActive) return;
-            const input = document.getElementById('answerInput').value.trim().toLowerCase();
-            const correct = riddles[currentIndex].answer.toLowerCase();
 
-            if (input === correct) {
-                updatePower(15); // Push bar up
-                showFeedback("DOMINATING!", "text-cyan-400");
+            const correctLetter = riddles[currentIndex].answer.toUpperCase();
+            const correctIndex = alphabetMap[correctLetter];
+
+            if (selectedIndex === correctIndex) {
+                updatePower(15);
+                showFeedback("CRITICAL HIT! +15", "text-cyan-400");
                 currentIndex++;
                 showRiddle();
             } else {
-                updatePower(-10); // Penalty
-                showFeedback("ERROR!", "text-red-500");
+                updatePower(-15);
+                document.getElementById('gameCard').classList.add('shake');
+                setTimeout(() => document.getElementById('gameCard').classList.remove('shake'), 200);
+                showFeedback("SYSTEM DAMAGE! -15", "text-red-500");
             }
         }
 
         function updatePower(amount) {
             power = Math.min(100, Math.max(0, power + amount));
             document.getElementById('playerBar').style.width = power + '%';
-            
-            if (power >= 100) endGame(true);
-            if (power <= 0) endGame(false);
+            if (power <= 0) gameOver();
         }
 
         function startDrain() {
-            const drainInterval = setInterval(() => {
-                if (!gameActive) {
-                    clearInterval(drainInterval);
-                    return;
-                }
-                updatePower(-0.5); // Constant drain by the Boss
-                document.getElementById('timer').innerText = `STREAK: ${currentIndex}`;
+            const drain = setInterval(() => {
+                if (!gameActive) return clearInterval(drain);
+                updatePower(-0.4); // Constant drain
             }, 500);
         }
 
         function showFeedback(text, colorClass) {
             const f = document.getElementById('feedback');
             f.innerText = text;
-            f.className = `mt-6 text-xs font-bold uppercase tracking-widest opacity-100 ${colorClass}`;
-            setTimeout(() => f.classList.add('opacity-0'), 1000);
+            f.className = `mt-8 text-xs font-black uppercase tracking-widest opacity-100 ${colorClass}`;
+            setTimeout(() => f.style.opacity = '0', 800);
         }
 
-        function endGame(won) {
+        async function victory() {
             gameActive = false;
+            const res = await fetch('/api/gauntlet/win', { method: 'POST' });
             document.getElementById('gameCard').innerHTML = `
-                <h2 class="text-5xl font-black mb-4">${won ? 'VICTORY' : 'DEFEATED'}</h2>
-                <p class="text-slate-400 mb-8">${won ? 'The Gauntlet has been conquered.' : 'The Cyber-Boss drained your energy.'}</p>
-                <button onclick="location.reload()" class="bg-cyan-500 text-slate-900 px-10 py-4 rounded-2xl font-black">RETRY</button>
+                <div class="py-6 md:py-10">
+                    <h2 class="text-4xl md:text-6xl font-black mb-4 italic text-cyan-500">VICTORY</h2>
+                    <p class="text-slate-400 font-bold mb-8">GAUNTLET CLEARED: +100 XP</p>
+                    <a href="/dashboard" class="inline-block bg-white text-slate-900 px-10 py-4 rounded-2xl font-black hover:scale-105 transition">BACK TO DASHBOARD</a>
+                </div>
             `;
         }
 
-        // Start on load
+        function gameOver() {
+            gameActive = false;
+            document.getElementById('gameCard').innerHTML = `
+                <div class="py-6 md:py-10">
+                    <h2 class="text-4xl md:text-6xl font-black mb-4 italic text-red-500">DEFEATED</h2>
+                    <p class="text-slate-400 font-bold mb-8">THE CYBER-BOSS DRAINED YOUR ENERGY</p>
+                    <button onclick="location.reload()" class="bg-white/10 border border-white/20 text-white px-10 py-4 rounded-2xl font-black hover:bg-white hover:text-slate-900 transition">RETRY GAUNTLET</button>
+                </div>
+            `;
+        }
+
         window.onload = startGauntlet;
     </script>
 </body>
