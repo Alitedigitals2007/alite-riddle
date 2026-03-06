@@ -135,36 +135,66 @@ app.get('/auth/google', passport.authenticate('google', {
 }));
 // --- DATABASE ROUTE FOR INSTANT CREATION ---
 app.post('/api/create-room', async (req, res) => {
-    const { mode } = req.body;
-    const username = req.user ? req.user.username : "Guest"; 
-    const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-
+    const { type, userId, username } = req.body;
+    const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+    
     const initialData = {
-        mode: mode || '1v1',
-        players: [{ username, id: null }], // ID updated on socket connect
+        type: type, // 'single' or 'team'
+        maxPlayers: type === 'single' ? 2 : 4,
+        players: [], // Will be filled by socket join
         status: 'waiting'
     };
 
     try {
         await pool.query(
-            'INSERT INTO rooms (room_code, room_data) VALUES ($1, $2)',
-            [roomCode, initialData]
+            'INSERT INTO rooms (room_code, room_data) VALUES ($1, $2)', 
+            [roomId, initialData]
         );
-        res.json({ roomCode });
+        res.json({ roomId, type: initialData.type });
     } catch (err) {
-        console.error("Room Creation Error:", err);
-        res.status(500).json({ error: "Could not create room" });
+        console.error("Creation Error:", err);
+        res.status(500).json({ error: "Database error" });
     }
 });
 
-// --- SOCKET LOGIC ---
+// --- 2. SOCKET ROOM LOGIC ---
 io.on('connection', (socket) => {
-    socket.on('join_room', async ({ roomCode, username }) => {
-        socket.join(roomCode);
-        // Logic to update DB with player's socket.id goes here
-        io.to(roomCode).emit('player_joined', { username, roomCode });
+    socket.on('joinRoom', async ({ roomId, userId, username }) => {
+        try {
+            const res = await pool.query('SELECT * FROM rooms WHERE room_code = $1', [roomId]);
+            if (res.rows.length === 0) return socket.emit('error', 'Room not found');
+
+            let roomData = res.rows[0].room_data;
+
+            // Add player if they aren't already in the data
+            const existingPlayer = roomData.players.find(p => p.userId === userId);
+            if (!existingPlayer) {
+                roomData.players.push({ userId, username, socketId: socket.id });
+                await pool.query('UPDATE rooms SET room_data = $1 WHERE room_code = $2', [roomData, roomId]);
+            }
+
+            socket.join(roomId);
+
+            // Tell everyone in the room to update their UI
+            io.to(roomId).emit('playerJoined', { 
+                players: roomData.players, 
+                maxPlayers: roomData.maxPlayers,
+                roomId: roomId,
+                type: roomData.type
+            });
+
+            // Start match if full
+            if (roomData.players.length === roomData.maxPlayers) {
+                // You can add your riddle fetching logic here
+                io.to(roomId).emit('matchStarted', { roomId });
+            }
+        } catch (err) {
+            console.error("Socket Join Error:", err);
+            socket.emit('error', 'Lobby synchronization failed');
+        }
     });
 });
+
 // 2. This is where Google sends the user back
 app.get('/auth/google/callback', 
     passport.authenticate('google', { failureRedirect: '/signin' }),
