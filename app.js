@@ -338,33 +338,41 @@ app.get('/api/scoreboard', async (req, res) => {
         res.status(500).json([]);
     }
 });
-// --- GAUNTLET API ROUTES ---
 
-/**
- * 1. START GAUNTLET
- * Fetches a randomized set of riddles for the session.
- */
 app.get('/api/gauntlet/start', async (req, res) => {
     try {
-        // Fetches 10 random riddles. Adjust the 'LIMIT' to change game length.
-        const result = await db.query(
-            'SELECT id, question, option_a, option_b, option_c, option_d, answer FROM riddles ORDER BY RANDOM() LIMIT 10'
-        );
+        // Using lowercase aliases to ensure they match your frontend's 'riddle.option_a'
+        const queryText = `
+            SELECT 
+                id, 
+                question, 
+                option_a AS "option_a", 
+                option_b AS "option_b", 
+                option_c AS "option_c", 
+                option_d AS "option_d", 
+                answer 
+            FROM riddles 
+            ORDER BY RANDOM() 
+            LIMIT 10
+        `;
+        
+        const result = await db.query(queryText);
+
+        // Check if the DB is empty
+        if (result.rows.length === 0) {
+            console.warn("Gauntlet started, but the 'riddles' table is empty!");
+            return res.status(404).json({ success: false, message: "No riddles found" });
+        }
 
         res.json({
             success: true,
             riddles: result.rows
         });
     } catch (err) {
-        console.error("Error starting gauntlet:", err);
-        res.status(500).json({ success: false, message: "Could not initialize riddles" });
+        console.error("❌ DB Query Error:", err.message);
+        res.status(500).json({ success: false, error: err.message });
     }
 });
-
-/**
- * 2. SETTLE GAUNTLET
- * Saves the session progress (XP and Points) to the user's profile.
- */
 app.post('/api/gauntlet/settle', async (req, res) => {
     // Ensure the user is logged in
     if (!req.user) {
