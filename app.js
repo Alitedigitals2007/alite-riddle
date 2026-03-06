@@ -157,8 +157,7 @@ function isLoggedIn(req, res, next) {
     res.redirect('/signin');
 }
 
-// 1. Ensure your Socket.io initialization is OUTSIDE the events
-const io = require('socket.io')(server, {
+{
     connectionStateRecovery: {}, 
     cors: { origin: "*", methods: ["GET", "POST"] }
 });
