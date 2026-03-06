@@ -90,191 +90,189 @@
             <div id="feedback" class="mt-8 text-center font-black text-xl h-8"></div>
         </div>
     </main>
+<script>
+    let riddles = [];
+    let currentIndex = 0;
+    let power = 50;
+    let totalXp = 0;
+    let gameActive = false;
+    let isProcessing = false;
+    const alphabetMap = ['A', 'B', 'C', 'D'];
 
-    <script>
-        let riddles = [];
-        let currentIndex = 0;
-        let power = 50;
-        let totalXp = 0;
-        let gameActive = false;
-        let isProcessing = false;
-        const alphabetMap = ['A', 'B', 'C', 'D'];
-
-        async function init() {
-            try {
-                const res = await fetch('/api/gauntlet/start');
-                const data = await res.json();
-                if (!data.success || !data.riddles.length) throw new Error();
-
-                riddles = data.riddles;
-                gameActive = true;
-                renderRiddle();
-                startDrain();
-            } catch (err) {
-                document.getElementById('questionText').innerText = "System Offline. Check DB.";
-            }
-        }
-
-        function showXpPop(amount, isPositive, x, y) {
-            const toast = document.createElement('div');
-            toast.className = `xp-toast ${isPositive ? 'text-cyan-500' : 'text-rose-500'}`;
-            toast.style.left = x + 'px';
-            toast.style.top = y + 'px';
-            toast.innerText = (isPositive ? '+' : '') + amount + ' XP';
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 1000);
-        }
-
-        function renderRiddle() {
-            if (currentIndex >= riddles.length) return triggerVictory();
-
-            const riddle = riddles[currentIndex];
-            document.getElementById('questionText').innerText = riddle.question;
-            document.getElementById('streakDisplay').innerText = `STREAK: ${currentIndex}`;
+    async function init() {
+        try {
+            const res = await fetch('/api/gauntlet/start');
+            const data = await res.json();
             
-            const dots = document.getElementById('streakDots');
-            dots.innerHTML = '';
-            riddles.forEach((_, i) => {
-                const dot = document.createElement('div');
-                dot.className = `w-2 h-2 rounded-full transition-all ${i < currentIndex ? 'bg-cyan-500 scale-125 shadow-[0_0_8px_#06b6d4]' : 'bg-slate-300'}`;
-                dots.appendChild(dot);
-            });
-
-            const container = document.getElementById('optionsContainer');
-            container.innerHTML = ''; 
-
-            alphabetMap.forEach((letter) => {
-                const btn = document.createElement('button');
-                btn.className = "option-btn group";
-                btn.innerHTML = `
-                    <span class="inline-block w-8 h-8 bg-slate-100 rounded-lg text-center leading-8 mr-3 group-hover:bg-cyan-100 group-hover:text-cyan-600 transition">${letter}</span>
-                    ${riddle['option_' + letter.toLowerCase()]}
-                `;
-                btn.onclick = (e) => validate(letter, btn, e.clientX, e.clientY);
-                container.appendChild(btn);
-            });
-            isProcessing = false;
-        }
-
-        function validate(choice, btn, mouseX, mouseY) {
-            if (!gameActive || isProcessing) return;
-
-            const correct = riddles[currentIndex].answer.toUpperCase();
-
-            if (choice === correct) {
-                isProcessing = true;
-                btn.classList.add('correct');
-                flashFeedback("PRECISION HIT!", "text-cyan-600");
-                
-                totalXp += 10;
-                document.getElementById('sessionXp').innerText = totalXp + " XP";
-                showXpPop(10, true, mouseX, mouseY);
-                
-                adjustPower(15);
-                setTimeout(() => {
-                    currentIndex++;
-                    renderRiddle();
-                }, 800);
-            } else {
-                btn.classList.add('wrong');
-                flashFeedback("CORE LEAK!", "text-red-500");
-                
-                totalXp = Math.max(0, totalXp - 5);
-                document.getElementById('sessionXp').innerText = totalXp + " XP";
-                showXpPop(-5, false, mouseX, mouseY);
-                
-                adjustPower(-20);
-                btn.disabled = true;
-                document.querySelector('.floating-card').animate([
-                    { transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }
-                ], { duration: 100, iterations: 4 });
+            if (!data.success || !data.riddles || data.riddles.length === 0) {
+                throw new Error("No riddles returned from server");
             }
+
+            riddles = data.riddles;
+            gameActive = true;
+            renderRiddle();
+            startDrain();
+        } catch (err) {
+            console.error("Initialization Failed:", err);
+            document.getElementById('questionText').innerText = "System Offline. Check DB.";
         }
-
-        function adjustPower(amt) {
-            power = Math.min(100, Math.max(0, power + amt));
-            document.getElementById('playerBar').style.width = power + '%';
-            const circle = document.getElementById('powerCircle');
-            circle.style.strokeDashoffset = 176 - (power / 100) * 176;
-            if (power <= 0) triggerLoss();
-        }
-
-        function startDrain() {
-            setInterval(() => { if (gameActive) adjustPower(-0.35); }, 600);
-        }
-
-        function flashFeedback(msg, color) {
-            const el = document.getElementById('feedback');
-            el.innerText = msg;
-            el.className = `mt-8 text-center font-black text-xl h-8 ${color}`;
-            setTimeout(() => el.innerText = '', 1000);
-        }
-
-        async function settle(status) {
-            try {
-                await fetch('/api/gauntlet/settle', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ xp: totalXp, status: status })
-                });
-            } catch (e) { console.error("Settlement error"); }
-        }
-async function triggerVictory() {
-    gameActive = false;
-    
-    // Add an Efficiency Bonus: 1 extra XP for every 5% power remaining
-    const bonusXp = Math.floor(power / 5);
-    const finalSessionXp = totalXp + bonusXp;
-
-    // Send the final data to the app.js route
-    const response = await settle('win', finalSessionXp);
-
-    document.getElementById('gameCard').innerHTML = `
-        <div class="bg-white rounded-[3rem] p-12 text-center shadow-2xl border-4 border-cyan-400 floating-card">
-            <div class="text-6xl mb-6">🏆</div>
-            <h2 class="text-4xl font-black text-slate-900 mb-2">GAUNTLET CLEARED</h2>
-            <div class="flex justify-center gap-4 mb-8">
-                <div class="bg-cyan-50 p-4 rounded-2xl">
-                    <span class="block text-[10px] uppercase font-black text-cyan-600">Base XP</span>
-                    <span class="text-2xl font-black">${totalXp}</span>
-                </div>
-                <div class="bg-amber-50 p-4 rounded-2xl">
-                    <span class="block text-[10px] uppercase font-black text-amber-600">Bonus</span>
-                    <span class="text-2xl font-black">+${bonusXp}</span>
-                </div>
-            </div>
-            <button onclick="window.location.href='/dashboard'" class="bg-cyan-600 text-white px-10 py-4 rounded-2xl font-black hover:scale-105 transition shadow-lg shadow-cyan-200 w-full">
-                COLLECT ${finalSessionXp} XP
-            </button>
-        </div>`;
-}
-
-// Helper to handle the API call
-async function settle(status, xpAmount) {
-    try {
-        const res = await fetch('/api/gauntlet/settle', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ xp: xpAmount, status: status })
-        });
-        return await res.json();
-    } catch (e) {
-        console.error("Settlement failed", e);
     }
-}
 
-        async function triggerLoss() {
-            gameActive = false;
-            await settle('loss');
-            document.getElementById('gameCard').innerHTML = `
-                <div class="bg-white rounded-[3rem] p-12 text-center shadow-2xl border-4 border-red-400">
-                    <h2 class="text-4xl font-black text-red-500 mb-2">DEFEATED</h2>
-                    <p class="text-slate-500 mb-8">Data salvaged: +${Math.floor(totalXp/2)} XP</p>
-                    <button onclick="location.reload()" class="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black hover:scale-105 transition">RETRY GAUNTLET</button>
-                </div>`;
+    function showXpPop(amount, isPositive, x, y) {
+        const toast = document.createElement('div');
+        toast.className = `xp-toast ${isPositive ? 'text-cyan-500' : 'text-rose-500'}`;
+        toast.style.left = x + 'px';
+        toast.style.top = y + 'px';
+        toast.innerText = (isPositive ? '+' : '') + amount + ' XP';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 1000);
+    }
+
+    function renderRiddle() {
+        if (currentIndex >= riddles.length) return triggerVictory();
+
+        const riddle = riddles[currentIndex];
+        document.getElementById('questionText').innerText = riddle.question;
+        document.getElementById('streakDisplay').innerText = `STREAK: ${currentIndex}`;
+        
+        const dots = document.getElementById('streakDots');
+        dots.innerHTML = '';
+        riddles.forEach((_, i) => {
+            const dot = document.createElement('div');
+            dot.className = `w-2 h-2 rounded-full transition-all duration-300 ${i < currentIndex ? 'bg-cyan-500 scale-125 shadow-[0_0_8px_#06b6d4]' : 'bg-slate-300'}`;
+            dots.appendChild(dot);
+        });
+
+        const container = document.getElementById('optionsContainer');
+        container.innerHTML = ''; 
+
+        alphabetMap.forEach((letter) => {
+            const btn = document.createElement('button');
+            btn.className = "option-btn group";
+            btn.innerHTML = `
+                <span class="inline-block w-8 h-8 bg-slate-100 rounded-lg text-center leading-8 mr-3 group-hover:bg-cyan-100 group-hover:text-cyan-600 transition">${letter}</span>
+                ${riddle['option_' + letter.toLowerCase()]}
+            `;
+            btn.onclick = (e) => validate(letter, btn, e.clientX, e.clientY);
+            container.appendChild(btn);
+        });
+        isProcessing = false;
+    }
+
+    function validate(choice, btn, mouseX, mouseY) {
+        if (!gameActive || isProcessing) return;
+
+        const correct = riddles[currentIndex].answer.toUpperCase();
+
+        if (choice === correct) {
+            isProcessing = true;
+            btn.classList.add('correct');
+            flashFeedback("PRECISION HIT!", "text-cyan-600");
+            
+            totalXp += 10;
+            document.getElementById('sessionXp').innerText = totalXp + " XP";
+            showXpPop(10, true, mouseX, mouseY);
+            
+            adjustPower(15);
+            setTimeout(() => {
+                currentIndex++;
+                renderRiddle();
+            }, 800);
+        } else {
+            btn.classList.add('wrong');
+            flashFeedback("CORE LEAK!", "text-red-500");
+            
+            totalXp = Math.max(0, totalXp - 5);
+            document.getElementById('sessionXp').innerText = totalXp + " XP";
+            showXpPop(-5, false, mouseX, mouseY);
+            
+            adjustPower(-20);
+            btn.disabled = true;
+            document.querySelector('.floating-card').animate([
+                { transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }
+            ], { duration: 100, iterations: 4 });
         }
+    }
 
-        window.onload = init;
-    </script>
+    function adjustPower(amt) {
+        power = Math.min(100, Math.max(0, power + amt));
+        document.getElementById('playerBar').style.width = power + '%';
+        const circle = document.getElementById('powerCircle');
+        const circumference = 176;
+        circle.style.strokeDashoffset = circumference - (power / 100) * circumference;
+        
+        if (power <= 0 && gameActive) triggerLoss();
+    }
+
+    function startDrain() {
+        setInterval(() => { if (gameActive) adjustPower(-0.35); }, 600);
+    }
+
+    function flashFeedback(msg, color) {
+        const el = document.getElementById('feedback');
+        el.innerText = msg;
+        el.className = `mt-8 text-center font-black text-xl h-8 ${color} transition-opacity duration-300`;
+        setTimeout(() => el.innerText = '', 1000);
+    }
+
+    // Single Helper for API Settlement
+    async function settleGauntlet(status, xpAmount) {
+        try {
+            const res = await fetch('/api/gauntlet/settle', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ xp: xpAmount, status: status })
+            });
+            return await res.json();
+        } catch (e) {
+            console.error("Settlement failed", e);
+        }
+    }
+
+    async function triggerVictory() {
+        gameActive = false;
+        const bonusXp = Math.floor(power / 5);
+        const finalSessionXp = totalXp + bonusXp;
+
+        await settleGauntlet('win', finalSessionXp);
+
+        document.getElementById('gameCard').innerHTML = `
+            <div class="bg-white rounded-[3rem] p-12 text-center shadow-2xl border-4 border-cyan-400 floating-card">
+                <div class="text-6xl mb-6">🏆</div>
+                <h2 class="text-4xl font-black text-slate-900 mb-2">GAUNTLET CLEARED</h2>
+                <div class="flex justify-center gap-4 mb-8">
+                    <div class="bg-cyan-50 p-4 rounded-2xl">
+                        <span class="block text-[10px] uppercase font-black text-cyan-600">Base</span>
+                        <span class="text-2xl font-black">${totalXp} XP</span>
+                    </div>
+                    <div class="bg-amber-50 p-4 rounded-2xl">
+                        <span class="block text-[10px] uppercase font-black text-amber-600">Bonus</span>
+                        <span class="text-2xl font-black">+${bonusXp} XP</span>
+                    </div>
+                </div>
+                <button onclick="window.location.href='/dashboard'" class="bg-cyan-600 text-white px-10 py-4 rounded-2xl font-black hover:scale-105 transition shadow-lg shadow-cyan-200 w-full">
+                    COLLECT ${finalSessionXp} XP
+                </button>
+            </div>`;
+    }
+
+    async function triggerLoss() {
+        gameActive = false;
+        const salvagedXp = Math.floor(totalXp / 2);
+        await settleGauntlet('loss', salvagedXp);
+
+        document.getElementById('gameCard').innerHTML = `
+            <div class="bg-white rounded-[3rem] p-12 text-center shadow-2xl border-4 border-red-400">
+                <div class="text-6xl mb-6">💀</div>
+                <h2 class="text-4xl font-black text-red-500 mb-2">DEFEATED</h2>
+                <p class="text-slate-500 mb-8 font-medium">Data salvaged: +${salvagedXp} XP</p>
+                <button onclick="location.reload()" class="bg-slate-900 text-white px-10 py-4 rounded-2xl font-black hover:scale-105 transition w-full">
+                    RETRY SESSION
+                </button>
+            </div>`;
+    }
+
+    window.onload = init;
+</script>
 </body>
 </html>
