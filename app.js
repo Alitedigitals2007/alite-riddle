@@ -156,32 +156,42 @@ function isLoggedIn(req, res, next) {
     }
     res.redirect('/signin');
 }
+
+// 1. Ensure your Socket.io initialization is OUTSIDE the events
+const io = require('socket.io')(server, {
+    connectionStateRecovery: {}, 
+    cors: { origin: "*", methods: ["GET", "POST"] }
+});
+
+// CREATE ROOM FIX
 socket.on('create_room', async (data) => {
+    // Generate a 5-character clean code
     const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
     
     const initialData = {
-        mode: data.mode, // '1v1' or '2v2'
+        mode: data.mode || '1v1', 
         players: [{ id: socket.id, username: data.username }],
         status: 'waiting'
     };
-const io = require('socket.io')(server, {
-    connectionStateRecovery: {}, // This helps if the Vercel function blips
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
-});
+
     try {
+        // Use JSON.stringify only if your column is TEXT. 
+        // If it's JSONB, most drivers handle the object directly.
         await pool.query(
             'INSERT INTO rooms (room_code, room_data) VALUES ($1, $2)', 
-            [roomCode, JSON.stringify(initialData)]
+            [roomCode, initialData] 
         );
+        
         socket.join(roomCode);
         socket.emit('room_created', { roomCode });
+        console.log(`Room Created: ${roomCode}`);
     } catch (err) {
         console.error("Error creating room:", err);
+        socket.emit('error_message', 'Failed to create room.');
     }
 });
+
+// JOIN ROOM FIX
 socket.on('join_room', async (data) => {
     const { roomCode, username } = data;
 
@@ -189,21 +199,39 @@ socket.on('join_room', async (data) => {
         const result = await pool.query('SELECT * FROM rooms WHERE room_code = $1', [roomCode]);
 
         if (result.rows.length === 0) {
-            return socket.emit('error_message', 'Room not found or expired.');
+            return socket.emit('error_message', 'Room not found.');
         }
 
-        let roomData = result.rows[0].room_data;
+        // Handle JSON parsing safety
+        let roomData = typeof result.rows[0].room_data === 'string' 
+            ? JSON.parse(result.rows[0].room_data) 
+            : result.rows[0].room_data;
+
+        // Prevent joining if room is full (e.g., for 1v1)
+        if (roomData.mode === '1v1' && roomData.players.length >= 2) {
+            return socket.emit('error_message', 'Room is full.');
+        }
+
+        // Add the new player
         roomData.players.push({ id: socket.id, username: username });
 
-        // Update the room in the DB with the new player
+        // Update DB
         await pool.query('UPDATE rooms SET room_data = $1 WHERE room_code = $2', 
-            [JSON.stringify(roomData), roomCode]);
+            [roomData, roomCode]);
 
         socket.join(roomCode);
+        
+        // Use io.to().emit to tell EVERYONE in the room (including the creator)
         io.to(roomCode).emit('player_joined', roomData);
         
+        // If 2 players are in, trigger the start
+        if (roomData.players.length === 2) {
+            io.to(roomCode).emit('start_game', roomData);
+        }
+
     } catch (err) {
         console.error("Error joining room:", err);
+        socket.emit('error_message', 'Server error during join.');
     }
 });
 app.get('/dashboard', isLoggedIn, async (req, res) => {
