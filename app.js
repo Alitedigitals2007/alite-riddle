@@ -387,32 +387,14 @@ app.get('/api/gauntlet/start', async (req, res) => {
     }
 });
 app.post('/api/gauntlet/settle', async (req, res) => {
-    const { xp, status } = req.body;
-    
-    // IMPORTANT: Ensure req.user exists (Passport.js/Session)
-    if (!req.user || !req.user.id) {
-        return res.status(401).json({ success: false, message: "User not logged in" });
-    }
+    const { xp } = req.body;
+    if (!req.user) return res.status(401).send('Unauthorized');
 
     try {
-        const finalXp = status === 'win' ? xp : Math.floor(xp / 2);
-        
-        // Use "xp = xp + $1" to ensure it adds to the current total
-        const query = `
-            UPDATE users 
-            SET xp = xp + $1, 
-                points = points + $2 
-            WHERE id = $3 
-            RETURNING xp;
-        `;
-        
-        const result = await db.query(query, [finalXp, Math.floor(finalXp / 10), req.user.id]);
-
-        console.log(`✅ XP Updated for ${req.user.username}. New Total: ${result.rows[0].xp}`);
-        
-        res.json({ success: true, newTotal: result.rows[0].xp });
+        // Atomic update: adds to existing XP instead of replacing it
+        await db.query('UPDATE users SET xp = xp + $1 WHERE id = $2', [xp, req.user.id]);
+        res.json({ success: true });
     } catch (err) {
-        console.error("❌ Settle Error:", err);
         res.status(500).json({ success: false });
     }
 });
