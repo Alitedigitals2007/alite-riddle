@@ -399,22 +399,6 @@ app.post('/api/gauntlet/settle', async (req, res) => {
     }
 });
 
-        const result = await db.query(updateQuery, [finalXpGain, pointsGain, userId]);
-
-        res.json({
-            success: true,
-            message: "Session synchronized",
-            addedXp: finalXpGain,
-            addedPoints: pointsGain,
-            newTotalXp: result.rows[0].xp
-        });
-
-    } catch (err) {
-        console.error("Settlement error:", err);
-        res.status(500).json({ success: false, message: "Failed to save progress" });
-    }
-});
-
 // SAVE POINTS
 app.post('/api/gauntlet/win', async (req, res) => {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" });
