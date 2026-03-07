@@ -387,29 +387,35 @@ app.get('/api/gauntlet/start', async (req, res) => {
     }
 });
 app.post('/api/gauntlet/settle', async (req, res) => {
-    // Ensure the user is logged in
-    if (!req.user) {
-        return res.status(401).json({ success: false, message: "Unauthorized" });
+    const { xp, status } = req.body;
+    
+    // IMPORTANT: Ensure req.user exists (Passport.js/Session)
+    if (!req.user || !req.user.id) {
+        return res.status(401).json({ success: false, message: "User not logged in" });
     }
 
-    const { xp, status } = req.body;
-    const userId = req.user.id;
-
     try {
-        // Logic: Full XP on win, 50% XP on loss
-        const finalXpGain = status === 'win' ? xp : Math.floor(xp / 2);
+        const finalXp = status === 'win' ? xp : Math.floor(xp / 2);
         
-        // Logic: Points are 10% of the XP gained (Adjust as needed)
-        const pointsGain = Math.floor(finalXpGain * 0.1);
-
-        // Update the user table (increments existing values)
-        const updateQuery = `
+        // Use "xp = xp + $1" to ensure it adds to the current total
+        const query = `
             UPDATE users 
             SET xp = xp + $1, 
                 points = points + $2 
-            WHERE id = $3
-            RETURNING xp, points;
+            WHERE id = $3 
+            RETURNING xp;
         `;
+        
+        const result = await db.query(query, [finalXp, Math.floor(finalXp / 10), req.user.id]);
+
+        console.log(`✅ XP Updated for ${req.user.username}. New Total: ${result.rows[0].xp}`);
+        
+        res.json({ success: true, newTotal: result.rows[0].xp });
+    } catch (err) {
+        console.error("❌ Settle Error:", err);
+        res.status(500).json({ success: false });
+    }
+});
 
         const result = await db.query(updateQuery, [finalXpGain, pointsGain, userId]);
 
