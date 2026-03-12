@@ -176,30 +176,38 @@ app.get('/dashboard', isLoggedIn, async (req, res) => {
         res.status(500).send("Server Error");
     }
 });
-app.get('/leaderboard', isLoggedIn, async (req, res) => {
+app.get('/leaderboard', async (req, res) => {
+    if (!req.isAuthenticated()) return res.redirect('/login');
+
     try {
-        // Fetch top 50 players ranked by level then points
-        const leaders = await pool.query(`
-            SELECT username, current_level, points 
+        // 1. Get the Top 50 players 
+        // Logic: Highest Level first, then highest EXP as a tie-breaker
+        const leadersResult = await pool.query(`
+            SELECT username, current_level, exp 
             FROM users 
-            ORDER BY current_level DESC, points DESC 
+            ORDER BY current_level DESC, exp DESC 
             LIMIT 50
         `);
 
-        // Find current user's rank
-        const rankRes = await pool.query(`
-            SELECT COUNT(*) + 1 as rank 
+        // 2. Calculate the logged-in user's exact rank
+        // We count everyone who has a higher level OR (same level AND more exp)
+        const rankResult = await pool.query(`
+            SELECT COUNT(*) + 1 AS rank 
             FROM users 
-            WHERE current_level > $1 OR (current_level = $1 AND points > $2)
-        `, [req.user.current_level, req.user.points]);
+            WHERE current_level > $1 
+            OR (current_level = $1 AND exp > $2)
+        `, [req.user.current_level, req.user.exp || 0]);
+
+        const userRank = rankResult.rows[0].rank;
 
         res.render('leaderboard', {
-            leaders: leaders.rows,
             user: req.user,
-            userRank: rankRes.rows[0].rank
+            leaders: leadersResult.rows,
+            userRank: parseInt(userRank)
         });
     } catch (err) {
-        res.status(500).send("Error loading leaderboard");
+        console.error("Leaderboard Route Error:", err);
+        res.redirect('/dashboard');
     }
 });
 
@@ -544,6 +552,198 @@ app.get('/api/scoreboard', async (req, res) => {
         res.json(result.rows);
     } catch (err) {
         res.status(500).json([]);
+    }
+});
+
+// Gauntlet Mode - Speed Drill
+app.get('/gauntlet', async (req, res) => {
+    if (!req.isAuthenticated()) return res.redirect('/login');
+    
+    try {
+        // Change 'db' to 'pool' here
+        const riddles = await pool.query('SELECT * FROM riddles ORDER BY RANDOM() LIMIT 20');
+
+        res.render('gauntlet', {
+            user: req.user,
+            riddles: riddles.rows,
+            title: "Gauntlet Mode"
+        });
+    } catch (err) {
+        console.error("Gauntlet Route Error:", err);
+        res.redirect('/dashboard');
+    }
+});
+
+// Post route to handle gauntlet completion
+app.post('/gauntlet/complete', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ success: false });
+
+    const { score } = req.body;
+    const userId = req.user.id;
+    const xpGained = score * 5; 
+
+    try {
+        // Changed "xp" to "exp" to match your table schema
+        await pool.query(
+            'UPDATE users SET exp = COALESCE(exp, 0) + $1, points = points + $1 WHERE id = $2', 
+            [xpGained, userId]
+        );
+        res.json({ success: true, xpGained });
+    } catch (err) {
+        console.error("Gauntlet Update Error:", err);
+        res.status(500).json({ success: false });
+    }
+});
+
+// Make sure this is at the top of app.js
+const clients = new Map(); 
+
+app.get('/game-stream', (req, res) => {
+    if (!req.user) return res.end();
+    
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    clients.set(req.user.id, res); // This is vital!
+
+    req.on('close', () => {
+        clients.delete(req.user.id);
+        if (waitingQueue && waitingQueue.id === req.user.id) waitingQueue = null;
+    });
+});
+app.post('/battle/finish', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ success: false });
+
+    const { matchId, score, opponentId } = req.body;
+    const userId = req.user.id;
+
+    try {
+        // Find if the opponent has already finished
+        // (Optional: You could store battle results in a 'battles' table)
+        
+        let xpGained = 10; // Base XP for playing
+        let resultMessage = "Good Game!";
+
+        // Logic: Winner gets 50, Loser gets 10
+        // For simplicity in this version, we trust the client's result
+        // or you can compare scores if you stored them in a DB.
+        
+        if (score >= 7) { // Example: High performance bonus
+            xpGained = 50;
+            resultMessage = "Victory! You dominated the Arena.";
+        }
+
+        await pool.query(
+            'UPDATE users SET exp = COALESCE(exp, 0) + $1, points = points + $1 WHERE id = $2',
+            [xpGained, userId]
+        );
+
+        res.json({ success: true, xpGained, message: resultMessage });
+    } catch (err) {
+        console.error("Battle Finish Error:", err);
+        res.status(500).json({ success: false });
+    }
+});
+
+app.post('/update-score', async (req, res) => {
+    const { score, opponentId } = req.body;
+    
+    // Find the opponent's active SSE stream
+    const opponentStream = clients.get(opponentId);
+
+    if (opponentStream) {
+        // PUSH data to the opponent only
+        opponentStream.write(`data: ${JSON.stringify({ 
+            type: 'opponent_update', 
+            newScore: score 
+        })}\n\n`);
+    }
+
+    res.sendStatus(200);
+});
+
+let waitingQueue = null; // Stores the {id, username, res} of the first person waiting
+
+app.post('/battle/join', async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ error: "Unauthorized" });
+
+    const userId = req.user.id;
+    const username = req.user.username;
+
+    // 1. If someone is already waiting, pair them up
+    if (waitingQueue && waitingQueue.id !== userId) {
+        const opponent = waitingQueue;
+        waitingQueue = null; // Clear the queue
+
+        try {
+            // Fetch 10 random riddles for the battle
+            const riddles = await pool.query('SELECT * FROM riddles ORDER BY RANDOM() LIMIT 10');
+            const matchId = `match_${Date.now()}`;
+
+            // 2. Alert Player 1 (The one who was waiting) via their SSE stream
+            const player1Stream = clients.get(opponent.id);
+            if (player1Stream) {
+                player1Stream.write(`data: ${JSON.stringify({
+                    type: 'match_start',
+                    matchId,
+                    opponentId: userId,
+                    opponentName: username,
+                    riddles: riddles.rows
+                })}\n\n`);
+            }
+
+            // 3. Return data to Player 2 (The one who just joined)
+            return res.json({
+                status: 'already_matched',
+                matchId,
+                opponentId: opponent.id,
+                opponentName: opponent.username,
+                riddles: riddles.rows
+            });
+
+        } catch (err) {
+            console.error(err);
+            return res.status(500).json({ error: "Matchmaking failed" });
+        }
+    } else {
+        // 2. Nobody is waiting, so this player becomes the waitingPlayer
+        waitingQueue = { id: userId, username: username };
+        return res.json({ status: 'waiting', message: "Added to queue" });
+    }
+});
+
+app.get('/dashboard', async (req, res) => {
+    if (!req.isAuthenticated()) return res.redirect('/login');
+
+    try {
+        // 1. Get current rank
+        const rankResult = await pool.query(`
+            SELECT COUNT(*) + 1 AS rank 
+            FROM users 
+            WHERE current_level > $1 
+            OR (current_level = $1 AND exp > $2)
+        `, [req.user.current_level, req.user.exp || 0]);
+
+        const currentRank = parseInt(rankResult.rows[0].rank);
+        
+        // 2. Check if rank dropped (the number got bigger)
+        let rankAlert = false;
+        if (req.session.lastRank && currentRank > req.session.lastRank) {
+            rankAlert = true;
+        }
+        
+        // 3. Update session with newest rank
+        req.session.lastRank = currentRank;
+
+        res.render('dashboard', {
+            user: req.user,
+            rank: currentRank,
+            rankAlert: rankAlert
+        });
+    } catch (err) {
+        console.error(err);
+        res.redirect('/');
     }
 });
 

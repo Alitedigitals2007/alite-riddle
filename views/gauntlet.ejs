@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gauntlet Mode | Alite Riddles</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #0f172a; color: white; overflow: hidden; }
+        .option-btn { 
+            background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); 
+            border-radius: 1.5rem; padding: 1.25rem; font-weight: 700; transition: all 0.2s;
+            width: 100%; text-align: left; display: flex; align-items: center;
+        }
+        .option-btn:hover:not(:disabled) { background: rgba(255,255,255,0.1); border-color: #06b6d4; transform: translateY(-2px); }
+        .correct { background: #10b981 !important; border-color: #059669 !important; color: white !important; }
+        .wrong { background: #ef4444 !important; border-color: #dc2626 !important; color: white !important; }
+        
+        #timer-bar { height: 6px; transition: width 1s linear; }
+        .combo-text { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes pop { 0% { transform: scale(0.5); } 100% { transform: scale(1); } }
+        
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="fixed top-0 left-0 w-full p-6 flex justify-between items-center z-50">
+        <div class="glass px-6 py-3 rounded-2xl">
+            <span class="text-xs font-black uppercase text-slate-500 block leading-none">Score</span>
+            <span id="scoreText" class="text-2xl font-black text-cyan-400">0</span>
+        </div>
+        <div class="text-center">
+            <div id="comboDisplay" class="hidden">
+                <span class="text-xs font-black text-orange-500 uppercase">Combo</span>
+                <div id="comboCount" class="text-4xl font-black combo-text text-orange-400">0</div>
+            </div>
+        </div>
+        <div class="glass px-6 py-3 rounded-2xl text-right">
+            <span class="text-xs font-black uppercase text-slate-500 block leading-none">Time Left</span>
+            <span id="timerText" class="text-2xl font-black text-rose-500">45s</span>
+        </div>
+    </div>
+
+    <div class="fixed top-0 left-0 w-full bg-slate-800">
+        <div id="timer-bar" class="bg-cyan-500 w-full"></div>
+    </div>
+
+    <main class="w-full max-w-2xl">
+        <div id="questionContainer" class="glass rounded-[3rem] p-8 md:p-12 mb-8 text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-2 h-full bg-cyan-500"></div>
+            <p id="qIndex" class="text-cyan-500 font-black text-xs tracking-[0.2em] mb-4">GAUNTLET DRILL</p>
+            <h2 id="questionText" class="text-2xl md:text-4xl font-extrabold leading-tight">Loading...</h2>
+        </div>
+
+        <div id="optionsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            </div>
+    </main>
+
+    <div id="resultOverlay" class="fixed inset-0 bg-slate-950/95 z-[100] hidden flex-center flex-col p-8 text-center justify-center items-center">
+        <h2 class="text-5xl font-black mb-2">TIME'S UP!</h2>
+        <p class="text-slate-400 font-bold uppercase tracking-widest mb-10">Gauntlet Completed</p>
+        
+        <div class="grid grid-cols-2 gap-4 w-full max-w-sm mb-10">
+            <div class="glass p-6 rounded-3xl">
+                <span class="text-xs block text-slate-500 font-bold">SOLVED</span>
+                <span id="finalScore" class="text-3xl font-black text-cyan-400">0</span>
+            </div>
+            <div class="glass p-6 rounded-3xl">
+                <span class="text-xs block text-slate-500 font-bold">XP GAINED</span>
+                <span id="finalXP" class="text-3xl font-black text-emerald-400">0</span>
+            </div>
+        </div>
+
+        <button onclick="window.location.href='/dashboard'" class="bg-white text-slate-950 px-12 py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-cyan-400 transition">
+            Back to Dashboard
+        </button>
+    </div>
+
+    <script>
+        const riddles = <%- JSON.stringify(riddles) %>;
+        let currentIndex = 0;
+        let score = 0;
+        let combo = 0;
+        let timeLeft = 30;
+        let gameActive = true;
+
+        const timerInterval = setInterval(() => {
+            if(!gameActive) return;
+            timeLeft--;
+            document.getElementById('timerText').innerText = timeLeft + 's';
+            document.getElementById('timer-bar').style.width = (timeLeft / 30 * 100) + '%';
+
+            if(timeLeft <= 10) {
+                document.getElementById('timerText').classList.add('animate-pulse');
+                document.getElementById('timer-bar').classList.replace('bg-cyan-500', 'bg-rose-500');
+            }
+
+            if(timeLeft <= 0) endGame();
+        }, 1000);
+
+        function loadQuestion() {
+            if(currentIndex >= riddles.length) return endGame();
+            
+            const riddle = riddles[currentIndex];
+            document.getElementById('questionText').innerText = riddle.question;
+            const grid = document.getElementById('optionsGrid');
+            grid.innerHTML = '';
+
+            ['a', 'b', 'c', 'd'].forEach(letter => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn group';
+                btn.innerHTML = `
+                    <span class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center mr-4 font-black group-hover:text-cyan-400">${letter.toUpperCase()}</span>
+                    <span>${riddle['option_' + letter]}</span>
+                `;
+                btn.onclick = () => checkAnswer(letter.toUpperCase(), btn);
+                grid.appendChild(btn);
+            });
+        }
+
+        async function checkAnswer(choice, btn) {
+            if(!gameActive) return;
+            const riddle = riddles[currentIndex];
+            const correct = riddle.answer.trim().toUpperCase();
+
+            // Correct Logic
+            if(choice === correct) {
+                btn.classList.add('correct');
+                score++;
+                combo++;
+                document.getElementById('scoreText').innerText = score;
+                showCombo();
+            } else {
+                btn.classList.add('wrong');
+                combo = 0;
+                hideCombo();
+                // Find and highlight correct answer
+                Array.from(document.querySelectorAll('.option-btn')).forEach(b => {
+                    if(b.innerText.startsWith(correct)) b.classList.add('correct');
+                });
+            }
+
+            // Quick pause before next question
+            gameActive = false;
+            setTimeout(() => {
+                currentIndex++;
+                gameActive = true;
+                loadQuestion();
+            }, 600);
+        }
+
+        function showCombo() {
+            if(combo > 1) {
+                const el = document.getElementById('comboDisplay');
+                el.classList.remove('hidden');
+                document.getElementById('comboCount').innerText = combo + 'x';
+            }
+        }
+
+        function hideCombo() {
+            document.getElementById('comboDisplay').classList.add('hidden');
+        }
+
+        async function endGame() {
+            gameActive = false;
+            clearInterval(timerInterval);
+            
+            const xpGained = score * 5;
+            document.getElementById('finalScore').innerText = score;
+            document.getElementById('finalXP').innerText = '+' + xpGained;
+            document.getElementById('resultOverlay').classList.remove('hidden');
+
+            // Send results to server
+            try {
+                await fetch('/gauntlet/complete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score: score })
+                });
+            } catch (e) { console.error("Score sync failed"); }
+        }
+
+        // Start game
+        loadQuestion();
+    </script>
+</body>
+</html>

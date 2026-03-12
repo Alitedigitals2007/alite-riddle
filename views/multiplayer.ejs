@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Battle Arena | Alite Riddles</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #0f172a; color: white; overflow-x: hidden; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
+        
+        .option-btn { 
+            background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); 
+            border-radius: 1.5rem; padding: 1.25rem; font-weight: 700; transition: all 0.2s;
+            width: 100%; text-align: left; display: flex; align-items: center;
+        }
+        .option-btn:hover:not(:disabled) { background: rgba(255,255,255,0.1); border-color: #06b6d4; transform: translateY(-2px); }
+        .correct { background: #10b981 !important; border-color: #059669 !important; color: white !important; }
+        .wrong { background: #ef4444 !important; border-color: #dc2626 !important; color: white !important; }
+        
+        .vs-circle { background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%); box-shadow: 0 0 30px rgba(6, 182, 212, 0.4); }
+        
+        @keyframes pulse-custom { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .searching-pulse { animation: pulse-custom 2s infinite; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div id="matchmaking-ui" class="text-center w-full max-w-md">
+        <div class="mb-12 relative inline-block">
+            <div class="w-32 h-32 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin"></div>
+            <div class="absolute inset-0 flex items-center justify-center vs-circle w-20 h-20 m-auto rounded-full font-black text-2xl tracking-tighter italic">VS</div>
+        </div>
+        <h2 class="text-4xl font-black mb-3 tracking-tight">ARENA QUEUE</h2>
+        <p class="text-slate-400 font-medium searching-pulse">Searching for a challenger...</p>
+        
+        <div class="mt-12 glass p-6 rounded-[2rem] border-dashed border-slate-700">
+            <p class="text-xs font-black text-slate-500 uppercase tracking-widest mb-1">Combatant</p>
+            <p class="text-xl font-bold text-cyan-400"><%= user.username %></p>
+        </div>
+    </div>
+
+    <div id="battle-ui" class="hidden w-full max-w-5xl">
+        <div class="flex justify-between items-center mb-10 gap-4">
+            <div class="flex-1 glass p-5 rounded-3xl border-l-4 border-cyan-500 relative overflow-hidden">
+                <div class="flex items-center gap-4">
+                    <div class="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center font-black text-2xl">
+                        <%= user.username.charAt(0).toUpperCase() %>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-black text-slate-500 uppercase">You</p>
+                        <p class="text-xl font-black truncate max-w-[120px]"><%= user.username %></p>
+                    </div>
+                </div>
+                <div id="my-score-display" class="absolute right-6 top-1/2 -translate-y-1/2 text-4xl font-black text-cyan-400">0</div>
+            </div>
+
+            <div class="text-slate-700 font-black italic text-xl">VS</div>
+
+            <div class="flex-1 glass p-5 rounded-3xl border-r-4 border-rose-500 text-right relative overflow-hidden">
+                <div id="opp-score-display" class="absolute left-6 top-1/2 -translate-y-1/2 text-4xl font-black text-rose-500">0</div>
+                <div class="flex items-center gap-4 justify-end">
+                    <div>
+                        <p class="text-[10px] font-black text-slate-500 uppercase">Opponent</p>
+                        <p id="opp-name-display" class="text-xl font-black truncate max-w-[120px]">---</p>
+                    </div>
+                    <div id="opp-initial-display" class="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center font-black text-2xl text-rose-500">?</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass rounded-[3.5rem] p-8 md:p-16 mb-8 text-center relative overflow-hidden border-white/10">
+            <div class="absolute top-0 left-0 w-full h-1 bg-slate-800">
+                <div id="battle-progress" class="h-full bg-cyan-500 transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <p id="q-index-text" class="text-cyan-500 font-black text-xs tracking-[0.3em] mb-6 uppercase">Initializing Battle...</p>
+            <h2 id="question-text" class="text-2xl md:text-4xl font-extrabold leading-tight">Syncing with Arena server...</h2>
+        </div>
+
+        <div id="options-grid" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            </div>
+    </div>
+
+    <div id="finish-ui" class="hidden fixed inset-0 bg-slate-950/95 z-50 flex flex-col items-center justify-center p-8 text-center">
+        <div id="finish-emoji" class="text-8xl mb-6">🏆</div>
+        <h2 id="finish-title" class="text-6xl font-black mb-2 italic">VICTORY</h2>
+        <p id="finish-msg" class="text-slate-400 font-bold uppercase tracking-widest mb-12">You outsmarted the competition</p>
+        
+        <div class="glass p-8 rounded-[2.5rem] w-full max-w-sm mb-12">
+            <span class="text-xs font-black text-slate-500 uppercase block mb-2">Experience Gained</span>
+            <div id="finish-xp" class="text-5xl font-black text-emerald-400">+50 EXP</div>
+        </div>
+
+        <button onclick="window.location.href='/dashboard'" class="bg-white text-slate-950 px-12 py-5 rounded-2xl font-black uppercase tracking-widest hover:bg-cyan-400 transition transform hover:scale-105 active:scale-95">
+            Back to Dashboard
+        </button>
+    </div>
+
+    <script>
+       let myScore = 0;
+        let oppScore = 0;
+        let currentIndex = 0;
+        let riddles = [];
+        let opponentId = null;
+        let matchId = null;
+        let isGameOver = false;
+        let timerInterval = null; // Track the clock
+
+        // --- SSE: Listen for Server Commands ---
+        const eventSource = new EventSource('/game-stream');
+
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'match_start') setupMatch(data);
+            if (data.type === 'opponent_update') {
+                oppScore = data.newScore;
+                document.getElementById('opp-score-display').innerText = oppScore;
+            }
+        };
+
+        function setupMatch(data) {
+            matchId = data.matchId;
+            opponentId = data.opponentId;
+            riddles = data.riddles;
+            document.getElementById('opp-name-display').innerText = data.opponentName;
+            document.getElementById('opp-initial-display').innerText = data.opponentName.charAt(0).toUpperCase();
+            document.getElementById('matchmaking-ui').classList.add('hidden');
+            document.getElementById('battle-ui').classList.remove('hidden');
+            loadQuestion();
+        }
+
+        function startTimer() {
+            let timeLeft = 10;
+            const bar = document.getElementById('battle-progress');
+            bar.style.transition = 'none'; // Reset transition for instant refill
+            bar.style.width = '100%';
+            bar.classList.replace('bg-rose-500', 'bg-cyan-500');
+
+            // Force reflow
+            void bar.offsetWidth;
+
+            bar.style.transition = 'width 10s linear';
+            bar.style.width = '0%';
+
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                if (timeLeft <= 3) bar.classList.replace('bg-cyan-500', 'bg-rose-500');
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleAnswer(null, null); // Time's up!
+                }
+            }, 1000);
+        }
+
+        function loadQuestion() {
+            if (currentIndex >= riddles.length) return finishBattle();
+
+            const currentRiddle = riddles[currentIndex];
+            document.getElementById('q-index-text').innerText = `Riddle ${currentIndex + 1} of ${riddles.length}`;
+            document.getElementById('question-text').innerText = currentRiddle.question;
+
+            const grid = document.getElementById('options-grid');
+            grid.innerHTML = '';
+
+            ['a', 'b', 'c', 'd'].forEach(letter => {
+                const btn = document.createElement('button');
+                btn.className = 'option-btn group';
+                btn.innerHTML = `
+                    <span class="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center mr-4 font-black group-hover:text-cyan-400 transition-colors uppercase">${letter}</span>
+                    <span class="flex-1">${currentRiddle['option_' + letter]}</span>
+                `;
+                btn.onclick = () => handleAnswer(letter.toUpperCase(), btn);
+                grid.appendChild(btn);
+            });
+
+            startTimer();
+        }
+
+        async function handleAnswer(choice, btn) {
+            clearInterval(timerInterval); // Stop the clock immediately
+            const correct = riddles[currentIndex].answer.trim().toUpperCase();
+            const allBtns = document.querySelectorAll('.option-btn');
+            
+            allBtns.forEach(b => b.disabled = true);
+
+            if (choice === correct) {
+                if(btn) btn.classList.add('correct');
+                myScore++;
+                document.getElementById('my-score-display').innerText = myScore;
+                
+                fetch('/update-score', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score: myScore, opponentId, matchId })
+                });
+            } else if (choice !== null) {
+                if(btn) btn.classList.add('wrong');
+                allBtns.forEach(b => {
+                    if (b.innerText.includes(correct + " ")) b.classList.add('correct');
+                });
+            } else {
+                // Handle Time Out
+                document.getElementById('question-text').innerHTML = "<span class='text-rose-500'>OUT OF TIME!</span>";
+            }
+
+            setTimeout(() => {
+                currentIndex++;
+                loadQuestion();
+            }, 1000);
+        }
+
+        async function finishBattle() {
+            if (isGameOver) return;
+            isGameOver = true;
+            clearInterval(timerInterval);
+
+            const res = await fetch('/battle/finish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ matchId, score: myScore, opponentId })
+            });
+            const result = await res.json();
+
+            document.getElementById('finish-xp').innerText = `+${result.xpGained} EXP`;
+            document.getElementById('finish-msg').innerText = result.message;
+            if (result.xpGained < 50) {
+                document.getElementById('finish-title').innerText = "WELL PLAYED";
+                document.getElementById('finish-emoji').innerText = "🤝";
+            }
+            document.getElementById('battle-ui').classList.add('hidden');
+            document.getElementById('finish-ui').classList.remove('hidden');
+        }
+
+        async function startMatchmaking() {
+            try {
+                const res = await fetch('/battle/join', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'already_matched') setupMatch(data);
+            } catch (err) { console.error("Matchmaking error:", err); }
+        }
+
+        startMatchmaking();
+    </script>
+</body>
+</html>
