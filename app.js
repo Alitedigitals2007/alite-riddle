@@ -92,7 +92,8 @@ app.use(passport.session());
 passport.use(new GoogleStrategy({
     clientID: "386993811253-3g3cjkq8nkp43f5fns33m8pclk1cifq3.apps.googleusercontent.com",
     clientSecret: "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",
-    callbackURL: "/auth/google/callback"
+    callbackURL: "https://riddlefirst.vercel.app/auth/google/callback",
+proxy: true // This is REQUIRED for Vercel/Heroku to handle HTTPS correctly
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
